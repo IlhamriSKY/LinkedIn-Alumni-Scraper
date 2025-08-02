@@ -40,8 +40,9 @@ class ConfigManager:
     
     def __init__(self):
         """Initialize configuration manager and load environment variables."""
-        load_dotenv()
         self._script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        # Load environment variables from parent directory  
+        load_dotenv(os.path.join(os.path.dirname(self._script_dir), '.env'))
         self._setup_paths()
         self._setup_credentials()
         self._setup_university_info()

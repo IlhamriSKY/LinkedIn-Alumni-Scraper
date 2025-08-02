@@ -248,43 +248,101 @@
         </CardContent>
       </Card>
 
-      <!-- Login Section Component -->
-      <LoginSection 
-        :login-status="loginStatus"
-        :loading="loading"
-        :browser-manually-closed="browserManuallyClosed"
-        :login-progress="loginProgress"
-        @perform-manual-login="performManualLogin"
-        @manual-check-login="manualCheckLogin"
-      />
+      <!-- Results Section -->
+      <Card v-if="results.length > 0">
+        <CardHeader>
+          <CardTitle class="flex items-center justify-between">
+            <span>Scraping Results</span>
+            <div class="flex space-x-2">
+              <Button @click="refreshResults" variant="outline" size="sm">
+                <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
+                Refresh
+              </Button>
+              <Button @click="downloadResults" variant="outline" size="sm">
+                <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                Download
+              </Button>
+            </div>
+          </CardTitle>
+          <CardDescription>
+            Total results: {{ filteredResults.length }}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <!-- Search -->
+          <div class="mb-4">
+            <Label for="search">Search Results</Label>
+            <Input
+              id="search"
+              v-model="searchQuery"
+              placeholder="Search by name, title, company, or location..."
+              class="mt-1"
+            />
+          </div>
 
-      <!-- Scraping Control Component -->
-      <ScrapingControl 
-        :login-status="loginStatus"
-        :loading="loading"
-        :browser-manually-closed="browserManuallyClosed"
-        :scraping-config="scrapingConfig"
-        @auto-detect-classes="autoDetectClasses"
-        @start-scraping="startScraping"
-      />
+          <!-- Results Table -->
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="border-b">
+                  <th class="text-left p-2">Name</th>
+                  <th class="text-left p-2">Title</th>
+                  <th class="text-left p-2">Company</th>
+                  <th class="text-left p-2">Location</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="result in paginatedResults" :key="result.name" class="border-b hover:bg-muted/50">
+                  <td class="p-2 font-medium">{{ result.name || 'N/A' }}</td>
+                  <td class="p-2">{{ result.title || 'N/A' }}</td>
+                  <td class="p-2">{{ result.company || 'N/A' }}</td>
+                  <td class="p-2">{{ result.location || 'N/A' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
-      <!-- Progress Display Component -->
-      <ProgressDisplay 
-        :scraping-status="scrapingStatus"
-        :stats="stats"
-      />
-
-      <!-- Results Table Component -->
-      <ResultsTable 
-        :results="results"
-        :search-query="searchQuery"
-        :current-page="currentPage"
-        :results-per-page="resultsPerPage"
-        @refresh-results="refreshResults"
-        @download-results="downloadResults"
-        @update-search-query="updateSearchQuery"
-        @update-current-page="updateCurrentPage"
-      />
+          <!-- Pagination -->
+          <div class="flex items-center justify-center space-x-2 mt-4">
+            <Button 
+              variant="outline" 
+              size="sm"
+              @click="currentPage--"
+              :disabled="currentPage <= 1"
+              class="px-3"
+            >
+              <svg class="mr-1 h-4 w-4 sm:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+              </svg>
+              <span class="hidden sm:inline">Previous</span>
+              <span class="sm:hidden">Prev</span>
+            </Button>
+            
+            <!-- Page info -->
+            <span class="text-sm text-muted-foreground px-2">
+              {{ currentPage }} / {{ totalPages }}
+            </span>
+            
+            <Button 
+              variant="outline" 
+              size="sm"
+              @click="currentPage++"
+              :disabled="currentPage >= totalPages"
+              class="px-3"
+            >
+              <span class="hidden sm:inline">Next</span>
+              <span class="sm:hidden">Next</span>
+              <svg class="ml-1 h-4 w-4 sm:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+              </svg>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </main>
   </div>
 </template>
@@ -292,13 +350,11 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import ThemeToggle from '@/components/ThemeToggle.vue'
-import LoginSection from '@/components/LoginSection.vue'
-import ScrapingControl from '@/components/ScrapingControl.vue'
-import ProgressDisplay from '@/components/ProgressDisplay.vue'
-import ResultsTable from '@/components/ResultsTable.vue'
 import { api, apiRetry } from '@/utils/api'
 import { toast } from 'vue-sonner'
 
@@ -330,10 +386,6 @@ const currentPage = ref(1)
 const resultsPerPage = 10
 
 const loading = ref({
-  login: false,
-  cssDetection: false,
-  scraping: false,
-  manualCheck: false,
   browser: false
 })
 
@@ -344,19 +396,6 @@ const browserStatus = ref({
   status: 'Browser status unknown'
 })
 
-const browserManuallyClosed = ref(false)
-
-const loginProgress = ref({
-  step: 0,
-  message: 'Initializing...'
-})
-
-const scrapingConfig = ref({
-  location_class: '',
-  section_class: '',
-  max_profiles: 50
-})
-
 // Computed Properties
 const universityName = computed(() => {
   return universityInfo.value?.name || 'Loading University...'
@@ -365,6 +404,25 @@ const universityName = computed(() => {
 const progressPercentage = computed(() => {
   if (!stats.value.total_names) return 0
   return Math.round((scrapingStatus.value.current_index / stats.value.total_names) * 100)
+})
+
+const filteredResults = computed(() => {
+  if (!searchQuery.value) return results.value
+  const query = searchQuery.value.toLowerCase()
+  return results.value.filter(result => 
+    (result.name || '').toLowerCase().includes(query) ||
+    (result.title || '').toLowerCase().includes(query) ||
+    (result.company || '').toLowerCase().includes(query) ||
+    (result.location || '').toLowerCase().includes(query)
+  )
+})
+
+const totalPages = computed(() => Math.ceil(filteredResults.value.length / resultsPerPage))
+
+const paginatedResults = computed(() => {
+  const start = (currentPage.value - 1) * resultsPerPage
+  const end = start + resultsPerPage
+  return filteredResults.value.slice(start, end)
 })
 
 // Auto-update system
@@ -387,7 +445,7 @@ const startAutoUpdate = () => {
     } catch (error) {
       console.error('[ERROR] Auto-update failed:', error)
     }
-  }, 30000)
+  }, 30000) // Update every 30 seconds
 }
 
 const stopAutoUpdate = () => {
@@ -510,139 +568,6 @@ const openBrowser = async () => {
   }
 }
 
-// Component event handlers
-const performManualLogin = async () => {
-  loading.value.login = true
-  loginProgress.value = { step: 0, message: 'Initializing login process...' }
-  
-  try {
-    if (browserManuallyClosed.value) {
-      toast.warn('Please open browser manually first before attempting login.')
-      loading.value.login = false
-      loginProgress.value = { step: 0, message: 'Browser required - open manually' }
-      return
-    }
-    
-    loginProgress.value = { step: 1, message: 'Checking current login status...' }
-    const alreadyLoggedIn = await fetchLoginStatus()
-    if (alreadyLoggedIn) {
-      loading.value.login = false
-      return
-    }
-    
-    loginProgress.value = { step: 2, message: 'Opening LinkedIn login page...' }
-    const data = await api.manualLogin()
-    
-    if (data.success) {
-      toast.success('LinkedIn login page opened in browser. Starting auto-login...')
-      
-      loginProgress.value = { step: 3, message: 'Auto-typing credentials and logging in...' }
-      const autoLoginResult = await api.autoLogin()
-      
-      if (autoLoginResult.success) {
-        loginProgress.value = { step: 4, message: 'Verifying login success...' }
-        toast.success('Auto-login initiated! Verifying login status...')
-        
-        // Poll for login completion
-        let attempts = 0
-        const maxAttempts = 12
-        const pollInterval = setInterval(async () => {
-          attempts++
-          const isLoggedIn = await fetchLoginStatus()
-          
-          if (isLoggedIn) {
-            clearInterval(pollInterval)
-            loading.value.login = false
-            loginProgress.value = { step: 0, message: 'Successfully logged in!' }
-            toast.success('✅ Successfully connected to LinkedIn!')
-          } else if (attempts >= maxAttempts) {
-            clearInterval(pollInterval)
-            loading.value.login = false
-            loginProgress.value = { step: 0, message: 'Login timeout' }
-            toast.error('Login verification timed out. Please check manually.')
-          }
-        }, 5000)
-      } else {
-        toast.error('Auto login failed. Please login manually in the browser.')
-        loading.value.login = false
-        loginProgress.value = { step: 0, message: 'Login failed' }
-      }
-    } else {
-      toast.error(`Login failed: ${data.error}`)
-      loading.value.login = false
-      loginProgress.value = { step: 0, message: 'Failed to open LinkedIn page' }
-    }
-  } catch (error) {
-    console.error('[ERROR] Error during manual login:', error)
-    toast.error(`Network error: ${error.message}`)
-    loading.value.login = false
-    loginProgress.value = { step: 0, message: 'Network error occurred' }
-  }
-}
-
-const manualCheckLogin = async () => {
-  loading.value.manualCheck = true
-  
-  try {
-    const isLoggedIn = await fetchLoginStatus()
-    
-    if (isLoggedIn) {
-      toast.success('✅ LinkedIn connection confirmed!')
-      await fetchStats()
-    } else {
-      toast.info('ℹ️ Not connected to LinkedIn')
-    }
-  } catch (error) {
-    console.error('[ERROR] Manual check failed:', error)
-    toast.error('Failed to check login status')
-  } finally {
-    loading.value.manualCheck = false
-  }
-}
-
-const autoDetectClasses = async () => {
-  loading.value.cssDetection = true
-  try {
-    const data = await api.apiRequest('/auto-detect-classes', { 
-      method: 'POST' 
-    })
-    if (data.success) {
-      scrapingConfig.value.location_class = data.location_class || ''
-      scrapingConfig.value.section_class = data.section_class || ''
-      toast.success('CSS classes detected successfully!')
-    }
-  } catch (error) {
-    console.error('Error detecting classes:', error)
-    toast.error('Failed to detect CSS classes')
-  } finally {
-    loading.value.cssDetection = false
-  }
-}
-
-const startScraping = async () => {
-  if (browserManuallyClosed.value) {
-    toast.warn('Browser is required for scraping. Please open browser manually first.')
-    return
-  }
-  
-  loading.value.scraping = true
-  try {
-    const data = await api.startScraping(scrapingConfig.value)
-    if (data.success) {
-      toast.success('Scraping started successfully!')
-      scrapingStatus.value.is_running = true
-    } else {
-      console.error('❌ Failed to start scraping:', data.error)
-      toast.error(`Failed to start scraping: ${data.error}`)
-    }
-  } catch (error) {
-    console.error('Error starting scraping:', error)
-    toast.error(`Error starting scraping: ${error.message}`)
-  } finally {
-    loading.value.scraping = false
-  }
-}
-
 const downloadResults = () => {
   if (results.value.length > 0) {
     api.downloadFile(results.value[0].filename)
@@ -653,14 +578,10 @@ const refreshResults = () => {
   fetchResults()
 }
 
-const updateSearchQuery = (query) => {
-  searchQuery.value = query
+// Watchers
+watch(searchQuery, () => {
   currentPage.value = 1
-}
-
-const updateCurrentPage = (page) => {
-  currentPage.value = page
-}
+})
 
 // Lifecycle
 onMounted(async () => {

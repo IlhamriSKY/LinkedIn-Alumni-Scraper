@@ -119,12 +119,22 @@ def start_backend():
     print("[BACKEND] Starting Flask server...")
     
     try:
-        # Start backend as NON-BLOCKING subprocess using modern OOP API
-        print("[BACKEND] Starting modern OOP Flask server as subprocess on http://localhost:5000")
+        # Load environment variables to get port
+        env_file = Path(__file__).parent / ".env"
+        flask_port = "5000"  # Default port
         
-        # Use Popen to start backend WITHOUT blocking - using server mode
+        if env_file.exists():
+            with open(env_file, 'r') as f:
+                for line in f:
+                    if line.startswith('FLASK_PORT='):
+                        flask_port = line.split('=')[1].strip()
+                        break
+        
+        print(f"[BACKEND] Starting Flask server on port {flask_port}")
+        
+        # Start backend as NON-BLOCKING subprocess
         process = subprocess.Popen([
-            sys.executable, 'run.py', '--server'
+            sys.executable, 'app.py'
         ], cwd=alumni_dir)
         
         print("[BACKEND] Backend started successfully")
@@ -173,12 +183,23 @@ def main():
     print("[INFO] Waiting for backend to initialize...")
     time.sleep(8)  # Increased from 5 to 8 seconds
     
+    # Get Flask port from environment
+    env_file = Path(__file__).parent / ".env"
+    flask_port = "5000"  # Default port
+    
+    if env_file.exists():
+        with open(env_file, 'r') as f:
+            for line in f:
+                if line.startswith('FLASK_PORT='):
+                    flask_port = line.split('=')[1].strip()
+                    break
+    
     print("\n" + "="*60)
     print("Application URLs:")
     print("="*60)
     print("Frontend: http://localhost:3000")
-    print("Backend:  http://localhost:5000")
-    print("Health:   http://localhost:5000/health")
+    print(f"Backend:  http://localhost:{flask_port}")
+    print(f"Health:   http://localhost:{flask_port}/api/system/health")
     print("="*60)
     print("Tip: Press Ctrl+C to stop all servers")
     print("Both frontend and backend will close together")

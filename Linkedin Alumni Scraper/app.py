@@ -1,54 +1,37 @@
 """
 LinkedIn Alumni Scraper - Modern Flask API
 
-Clean Flask API implementation using dependency injection and service layer
-for better maintainability, testability, and separation of concerns.
-
-This module provides RESTful API endpoints for LinkedIn scraping operations
-with modern architecture patterns and comprehensive error handling.
+Clean Flask API implementation using comprehensive API service layer
+for better maintainability and separation of concerns.
+All endpoints delegate to api_service.py for business logic.
 """
 
+import os
+import signal
+import atexit
+import subprocess
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 from dotenv import load_dotenv
-import os
-import subprocess
-import signal
-import atexit
 from datetime import datetime
 
 # Import API service
 from api_service import api_service
 
-# Load environment variables
-load_dotenv()
-
 # Configuration
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
+
+# Load environment variables from project root with override
+load_dotenv(os.path.join(PROJECT_ROOT, '.env'), override=True)
+
 UNIVERSITY_NAME = os.getenv('UNIVERSITY_NAME', 'Default University')
 UNIVERSITY_LINKEDIN_ID = os.getenv('UNIVERSITY_LINKEDIN_ID', 'default-id')
+FLASK_PORT = int(os.getenv('FLASK_PORT', '5000'))
 
 # Global state
 vite_process = None
 app_shutdown = False
-
-def mask_email(email):
-    """Mask email for security display."""
-    if not email or '@' not in email:
-        return 'Email not configured in .env'
-    
-    username, domain = email.split('@', 1)
-    if len(username) <= 2:
-        # For very short usernames, show first char + *
-        masked_username = username[0] + '*'
-    elif len(username) <= 4:
-        # For short usernames, show first 2 chars + *
-        masked_username = username[:2] + '*'
-    else:
-        # For longer usernames, show first 3 chars + * + last char
-        masked_username = username[:3] + '*' + username[-1]
-    
-    return f"{masked_username}@{domain}"
 
 def cleanup_resources():
     """Clean up all resources on app shutdown."""
@@ -84,50 +67,70 @@ def create_app():
     app = Flask(__name__)
     CORS(app, resources={r"/api/*": {"origins": "*"}})
     
+    # Set request timeout
+    app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+    
+    # Error handlers
+    @app.errorhandler(Exception)
+    def handle_exception(e):
+        """Handle all exceptions with proper JSON response."""
+        error_msg = str(e)
+        print(f"[ERROR] Unhandled exception: {error_msg}")
+        return jsonify({
+            "success": False,
+            "error": f"Server error: {error_msg}",
+            "timestamp": datetime.now().isoformat()
+        }), 500
+    
+    @app.errorhandler(404)
+    def handle_not_found(e):
+        """Handle 404 errors."""
+        return jsonify({
+            "success": False,
+            "error": "Endpoint not found",
+            "timestamp": datetime.now().isoformat()
+        }), 404
+    
     # ===== SYSTEM ENDPOINTS =====
     
     @app.route('/api/system/info', methods=['GET'])
     def get_system_info():
         """Get system information and configuration."""
-        linkedin_email = os.getenv('LINKEDIN_EMAIL', '')
-        
-        return jsonify({
-            "success": True,
-            "system_info": {
-                "university_name": UNIVERSITY_NAME,
-                "university_linkedin_id": UNIVERSITY_LINKEDIN_ID,
-                "linkedin_email": mask_email(linkedin_email),
-                "script_directory": SCRIPT_DIR,
+        try:
+            print("[DEBUG] Getting system info...")
+            result = api_service.get_system_info()
+            print(f"[DEBUG] System info result: {result.get('success', False)}")
+            return jsonify(result)
+        except Exception as e:
+            print(f"[ERROR] System info error: {e}")
+            return jsonify({
+                "success": False,
+                "error": f"System info failed: {str(e)}",
                 "timestamp": datetime.now().isoformat()
-            }
-        })
+            }), 500
     
     @app.route('/api/system/health', methods=['GET'])
     def health_check():
         """Health check endpoint."""
-        try:
-            from core import get_service_status
-            service_status = get_service_status()
-            
-            return jsonify({
-                "success": True,
-                "status": "healthy",
-                "services": service_status,
-                "timestamp": datetime.now().isoformat()
-            })
-        except Exception as e:
-            return jsonify({
-                "success": False,
-                "status": "unhealthy",
-                "error": str(e)
-            }), 500
+        return jsonify(api_service.get_health_status())
     
     # ===== BROWSER MANAGEMENT ENDPOINTS =====
     
     @app.route('/api/browser/status', methods=['GET'])
     def browser_status():
         """Get current browser status."""
-        return jsonify(api_service.get_browser_status())
+        try:
+            print("[DEBUG] Getting browser status...")
+            result = api_service.get_browser_status()
+            print(f"[DEBUG] Browser status result: {result.get('success', False)}")
+            return jsonify(result)
+        except Exception as e:
+            print(f"[ERROR] Browser status error: {e}")
+            return jsonify({
+                "success": False,
+                "error": f"Browser status failed: {str(e)}",
+                "timestamp": datetime.now().isoformat()
+            }), 500
     
     @app.route('/api/browser/open', methods=['POST'])
     def open_browser():
@@ -161,7 +164,7 @@ def create_app():
         """Attempt automatic login."""
         return jsonify(api_service.auto_login())
     
-    # ===== CLASS DETECTION ENDPOINTS =====
+    # ===== CSS CLASS DETECTION ENDPOINTS =====
     
     @app.route('/api/classes/auto-detect', methods=['POST'])
     def auto_detect_classes():
@@ -225,22 +228,34 @@ def create_app():
         output_file = request.args.get('output_file')
         return jsonify(api_service.get_scraping_results(output_file))
     
+    @app.route('/api/data/stats', methods=['GET'])
+    def get_stats():
+        """Get application statistics."""
+        return jsonify(api_service.get_stats())
+    
     @app.route('/api/data/download-results', methods=['GET'])
     def download_results():
         """Download results as CSV file."""
         try:
-            from core.config import config
+            output_file = request.args.get('output_file')
             
-            output_file = request.args.get('output_file', config.default_output_file)
+            # Get results to check if file exists
+            results = api_service.get_scraping_results(output_file)
+            if not results.get('success') or not results.get('data'):
+                return jsonify({
+                    "success": False,
+                    "error": "No results available for download"
+                }), 404
             
-            if not os.path.exists(output_file):
+            file_path = results.get('results_file')
+            if not file_path or not os.path.exists(file_path):
                 return jsonify({
                     "success": False,
                     "error": "Results file not found"
                 }), 404
             
             return send_file(
-                output_file,
+                file_path,
                 as_attachment=True,
                 download_name=f"linkedin_scraping_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
                 mimetype='text/csv'
@@ -264,7 +279,7 @@ def create_app():
                 return jsonify({
                     "success": True,
                     "message": "Frontend development server is already running",
-                    "port": 5173
+                    "port": 3000
                 })
             
             frontend_dir = os.path.join(SCRIPT_DIR, 'frontend')
@@ -287,14 +302,14 @@ def create_app():
             return jsonify({
                 "success": True,
                 "message": "Frontend development server started",
-                "port": 5173,
-                "url": "http://localhost:5173"
+                "port": 3000,
+                "url": "http://localhost:3000"
             })
             
         except Exception as e:
             return jsonify({
                 "success": False,
-                "error": f"Failed to start frontend: {str(e)}"
+                "error": f"Failed to start frontend server: {str(e)}"
             }), 500
     
     @app.route('/api/dev/stop-frontend', methods=['POST'])
@@ -310,7 +325,7 @@ def create_app():
                 })
             
             vite_process.terminate()
-            vite_process.wait(timeout=10)
+            vite_process.wait(timeout=5)
             vite_process = None
             
             return jsonify({
@@ -321,7 +336,7 @@ def create_app():
         except Exception as e:
             return jsonify({
                 "success": False,
-                "error": f"Failed to stop frontend: {str(e)}"
+                "error": f"Failed to stop frontend server: {str(e)}"
             }), 500
     
     # ===== ERROR HANDLERS =====
@@ -370,17 +385,24 @@ def main():
         print("  • System Info: GET /api/system/info")
         print("  • Health Check: GET /api/system/health")
         print("  • Browser Status: GET /api/browser/status") 
+        print("  • Authentication: GET /api/auth/status")
         print("  • Start Scraping: POST /api/scraper/start")
         print("  • Scraping Status: GET /api/scraper/status")
+        print("  • Statistics: GET /api/data/stats")
         print("=" * 60)
-        print("Server starting on http://localhost:5000")
+        print(f"Server starting on http://localhost:{FLASK_PORT}")
         print("Press Ctrl+C to stop the server")
+        print("=" * 60)
+        
+        # Browser initialization removed - manual control only
+        print("[INFO] Browser initialization disabled - use frontend controls to open browser")
+        
         print("=" * 60)
         
         # Run Flask app
         app.run(
             host='0.0.0.0',
-            port=5000,
+            port=FLASK_PORT,
             debug=False,
             threaded=True
         )

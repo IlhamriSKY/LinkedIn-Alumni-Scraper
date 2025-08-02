@@ -3,8 +3,11 @@
  * Centralized API configuration to handle backend communication
  */
 
-// API Base URL - uses proxy in development, direct URL in production
-const API_BASE_URL = import.meta.env.DEV ? '/api' : 'http://127.0.0.1:5000/api'
+// Get Flask port from environment, fallback to 5000
+const FLASK_PORT = import.meta.env.VITE_FLASK_PORT || '5000'
+
+// API Base URL - use dynamic port from environment
+const API_BASE_URL = `http://127.0.0.1:${FLASK_PORT}/api`
 
 /**
  * Make API request with proper error handling
@@ -14,10 +17,6 @@ const API_BASE_URL = import.meta.env.DEV ? '/api' : 'http://127.0.0.1:5000/api'
  */
 export const apiRequest = async (endpoint, options = {}) => {
   const url = endpoint.startsWith('/api') ? endpoint : `${API_BASE_URL}${endpoint}`
-  
-  console.log(`[API] Making request to: ${url}`)
-  console.log(`[API] Base URL: ${API_BASE_URL}`)
-  console.log(`[API] DEV mode: ${import.meta.env.DEV}`)
   
   const defaultOptions = {
     headers: {
@@ -29,39 +28,43 @@ export const apiRequest = async (endpoint, options = {}) => {
   }
 
   try {
-    console.log(`[API] Sending request with options:`, defaultOptions)
-    
-    // Add timeout using AbortController
+    // Create AbortController for timeout
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 10000)
+    
+    // Set up timeout with proper cleanup
+    const timeoutId = setTimeout(() => {
+      controller.abort('Request timeout')
+    }, 15000) // Increased timeout to 15 seconds for browser operations
     
     const response = await fetch(url, {
       ...defaultOptions,
       signal: controller.signal
     })
     
+    // Clear timeout on successful response
     clearTimeout(timeoutId)
-    
-    console.log(`[API] Response status: ${response.status}`)
-    console.log(`[API] Response ok: ${response.ok}`)
     
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status} - ${response.statusText}`)
     }
     
     const jsonData = await response.json()
-    console.log(`[API] Response data:`, jsonData)
     return jsonData
   } catch (error) {
     console.error(`[API] Error for ${url}:`, error)
     console.error(`[API] Error type:`, error.constructor.name)
     console.error(`[API] Error message:`, error.message)
     
-    // Provide more specific error messages
+    // Handle specific error types with safe message checking
     if (error.name === 'AbortError') {
-      throw new Error('Request timeout - Backend may not be ready')
-    } else if (error.message.includes('Failed to fetch')) {
+      throw new Error('Request timeout - Server took too long to respond')
+    } else if (error.message && error.message.includes('Failed to fetch')) {
       throw new Error('Cannot connect to backend - Check if backend is running on port 5000')
+    } else if (error.message && error.message.includes('NetworkError')) {
+      throw new Error('Network error - Check your internet connection')
+    } else if (!error.message) {
+      // Handle cases where error.message is undefined
+      throw new Error('Unknown network error occurred')
     }
     
     throw error
@@ -69,52 +72,98 @@ export const apiRequest = async (endpoint, options = {}) => {
 }
 
 /**
- * API endpoints
+ * Retry mechanism for critical API operations
+ * @param {Function} apiCall - The API call function to retry
+ * @param {number} maxRetries - Maximum number of retries (default: 2)
+ * @param {number} delay - Delay between retries in ms (default: 1000)
+ * @returns {Promise} - API response or throws final error
  */
-export const API_ENDPOINTS = {
-  // University info
-  UNIVERSITY_INFO: '/university-info',
+export const apiRetry = async (apiCall, maxRetries = 2, delay = 1000) => {
+  let lastError
   
-  // Status and stats
-  STATUS: '/scraping-status',
-  STATS: '/stats',
-  HEALTH: '/health',
-  CHECK_LOGIN_STATUS: '/check-login-status',
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await apiCall()
+    } catch (error) {
+      lastError = error
+      
+      // Don't retry on certain errors
+      if (error.message && (
+        error.message.includes('Cannot connect to backend') ||
+        error.message.includes('Network error')
+      )) {
+        throw error
+      }
+      
+      // If this is the last attempt, throw the error
+      if (attempt === maxRetries) {
+        throw error
+      }
+      
+      // Wait before retrying
+      await new Promise(resolve => setTimeout(resolve, delay))
+    }
+  }
   
-  // Login operations
-  AUTO_LOGIN: '/auto-login',
-  MANUAL_LOGIN: '/manual-login',
-  
-  // Scraping operations
-  START_SCRAPING: '/start-scraping',
-  STOP_SCRAPING: '/stop-scraping',
-  
-  // Results
-  RESULTS: '/results',
-  DOWNLOAD: '/download'
+  throw lastError
 }
 
 /**
- * API helper functions
+ * API endpoints - Updated to use original endpoints
+ */
+export const API_ENDPOINTS = {
+  // System info (includes university info)
+  SYSTEM_INFO: '/system/info',
+  
+  // Status endpoints
+  SCRAPER_STATUS: '/scraper/status',
+  BROWSER_STATUS: '/browser/status',
+  AUTH_STATUS: '/auth/status',
+  HEALTH: '/system/health',
+  
+  // Authentication operations
+  AUTO_LOGIN: '/auth/auto-login',
+  MANUAL_LOGIN: '/auth/manual-login',
+  LOGIN_PAGE: '/auth/login-page',
+  
+  // Scraping operations
+  START_SCRAPING: '/scraper/start',
+  STOP_SCRAPING: '/scraper/stop',
+  
+  // Browser operations
+  OPEN_BROWSER: '/browser/open',
+  CLOSE_BROWSER: '/browser/close',
+  
+  // Data endpoints
+  RESULTS: '/data/results',
+  DOWNLOAD: '/data/download',
+  STATS: '/data/stats'
+}
+
+/**
+ * API helper functions - Updated to use original endpoints
  */
 export const api = {
   // Direct API request function
   apiRequest: apiRequest,
   
-  // Get university information
-  getUniversityInfo: () => apiRequest(API_ENDPOINTS.UNIVERSITY_INFO),
+  // Get system information (includes university info)
+  getSystemInfo: () => apiRequest(API_ENDPOINTS.SYSTEM_INFO),
+  
+  // Backward compatibility - alias for getSystemInfo
+  getUniversityInfo: () => apiRequest(API_ENDPOINTS.SYSTEM_INFO),
   
   // Get scraping status
-  getStatus: () => apiRequest(API_ENDPOINTS.STATUS),
+  getScrapingStatus: () => apiRequest(API_ENDPOINTS.SCRAPER_STATUS),
   
-  // Get statistics
-  getStats: () => apiRequest(API_ENDPOINTS.STATS),
+  // Get browser status
+  getBrowserStatus: () => apiRequest(API_ENDPOINTS.BROWSER_STATUS),
+  
+  // Check authentication status
+  checkAuthStatus: () => apiRequest(API_ENDPOINTS.AUTH_STATUS),
   
   // Health check
   getHealth: () => apiRequest(API_ENDPOINTS.HEALTH),
-  
-  // Check login status
-  checkLoginStatus: () => apiRequest(API_ENDPOINTS.CHECK_LOGIN_STATUS),
   
   // Auto login
   autoLogin: () => apiRequest(API_ENDPOINTS.AUTO_LOGIN, {
@@ -123,6 +172,11 @@ export const api = {
   
   // Manual login (opens LinkedIn in browser)
   manualLogin: () => apiRequest(API_ENDPOINTS.MANUAL_LOGIN, {
+    method: 'POST'
+  }),
+  
+  // Open LinkedIn login page
+  openLinkedInLogin: () => apiRequest(API_ENDPOINTS.LOGIN_PAGE, {
     method: 'POST'
   }),
   
@@ -137,8 +191,21 @@ export const api = {
     method: 'POST'
   }),
   
+  // Open browser
+  openBrowser: () => apiRequest(API_ENDPOINTS.OPEN_BROWSER, {
+    method: 'POST'
+  }),
+  
+  // Close browser
+  closeBrowser: () => apiRequest(API_ENDPOINTS.CLOSE_BROWSER, {
+    method: 'POST'
+  }),
+  
   // Get results
   getResults: () => apiRequest(API_ENDPOINTS.RESULTS),
+  
+  // Get statistics
+  getStats: () => apiRequest(API_ENDPOINTS.STATS),
   
   // Download file
   downloadFile: (filename) => {

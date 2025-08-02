@@ -37,7 +37,10 @@ from core.logging_utils import ScrapingLogger, get_error_logger
 # Initialize scraping logger for progress tracking
 scraping_logger = ScrapingLogger()
 logger = get_error_logger(__name__)
-load_dotenv()
+
+# Load environment variables from parent directory
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(os.path.dirname(SCRIPT_DIR), '.env'))
 
 # Configuration
 linkedin_email = os.getenv('LINKEDIN_EMAIL')

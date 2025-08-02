@@ -1,21 +1,34 @@
-# 🌐 LinkedIn Alumni Scraper
+# LinkedIn Alumni Scraper
 
-> **Automatically scrape LinkedIn alumni data!** A Python tool to collect alumni data from university LinkedIn pages with a modern web interface and clean logging system.
+A Python-based web application for scraping LinkedIn alumni data with a modern Vue.js interface.
 
-**Credits:** Based on [@notyouriiz - LinkedIn Alumni Scraper](https://github.com/notyouriiz/Linkedin_Scraper). Enhanced with modern web interface, clean logging system, and improved functionality.
+## Credits
 
-## ⚠️ USE AT YOUR OWN RISK
+Based on [@notyouriiz - LinkedIn Alumni Scraper](https://github.com/notyouriiz/Linkedin_Scraper). Enhanced with modern web interface, improved functionality, and clean logging system.
 
-❗ **IMPORTANT:** This tool may violate LinkedIn's Terms of Service. Scraping LinkedIn can result in account restrictions or legal issues. Use for educational purposes only. You are fully responsible for compliance with all laws and terms.
+## Purpose
 
----
+This tool automatically collects alumni data from university LinkedIn pages. It provides:
+- Automated LinkedIn login and data extraction
+- Modern web dashboard for monitoring scraping progress
+- CSV export functionality for collected data
+- Real-time progress tracking
 
-## 🚀 Quick Setup
+## ⚠️ Use at Your Own Risk
 
-### 1️⃣ **Setup Virtual Environment**
+**IMPORTANT WARNING:** This tool may violate LinkedIn's Terms of Service. Scraping LinkedIn can result in:
+- Account restrictions or suspension
+- Legal consequences
+- IP blocking
+
+Use this tool for **educational purposes only**. You are fully responsible for compliance with all applicable laws and terms of service.
+
+## Installation
+
+### 1. Setup Virtual Environment
 
 ```bash
-# Clone repository
+# Clone the repository
 git clone https://github.com/IlhamriSKY/Linkedin_Scraper.git
 cd Linkedin_Scraper
 
@@ -29,89 +42,93 @@ venv\Scripts\activate
 source venv/bin/activate
 ```
 
-### 2️⃣ **Install Dependencies**
+### 2. Install Python Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3️⃣ **Configure Environment**
+### 3. Install Frontend Dependencies
+
+```bash
+cd "Linkedin Alumni Scraper/frontend"
+npm install
+cd ..
+```
+
+### 4. Configure Environment
 
 ```bash
 # Copy example environment file
 cp .env.example .env
 
-# Edit .env file with your LinkedIn credentials:
+# Edit .env file with your credentials:
 # LINKEDIN_EMAIL=your_email@example.com
 # LINKEDIN_PASSWORD=your_password
-# UNIVERSITY_LINKEDIN_ID=your-university-id
+# UNIVERSITY_LINKEDIN_ID=your-university-linkedin-id
 # UNIVERSITY_NAME=Your University Name
 ```
 
-### 4️⃣ **Setup Names List**
+### 5. Setup Names List
 
 ```bash
 # Copy example names file
 cp "Linkedin Alumni Scraper/data/person_locations/indonesia_names_example.csv" "Linkedin Alumni Scraper/data/person_locations/indonesia_names.csv"
 
-# Edit indonesia_names.csv with names you want to scrape
+# Edit the CSV file with names you want to scrape
 ```
 
----
+## Running the Application
 
-## 🎯 How to Run
-
-### **Web Interface (Recommended)**
+### Option 1: Integrated Launcher (Recommended)
 
 ```bash
+python start.py
+```
+
+This will start both frontend and backend servers automatically.
+
+### Option 2: Manual Start
+
+```bash
+# Terminal 1 - Start Backend
 cd "Linkedin Alumni Scraper"
 python app.py
+
+# Terminal 2 - Start Frontend (in new terminal)
+cd "Linkedin Alumni Scraper/frontend"
+npm run dev
 ```
 
-Open browser to `http://localhost:3000`
+### Access the Application
 
-### **Command Line**
+- **Web Interface**: http://localhost:3000
+- **Backend API**: http://localhost:5000
 
-```bash
-cd "Linkedin Alumni Scraper"
-python main.py
-```
+## Testing
 
-**Process:**
-1. 🔐 **Auto login** - Automatically logs into LinkedIn
-2. 🔍 **Auto-detect CSS** - Detects required CSS classes
-3. 👥 **Scrape alumni** - Scrapes data based on names list
-4. 💾 **Save data** - Exports to CSV with timestamp
-5. 🧹 **Clean data** - Processes and cleans final output
-
----
-
-## 🧪 Testing (For Contributors)
-
-### **Setup Testing**
+### Run All Tests
 
 ```bash
 # Ensure virtual environment is active
-pip install pytest pytest-cov mockito
-```
+pip install pytest pytest-cov
 
-### **Run Tests**
-
-```bash
-# Run all tests
+# Run tests
 python -m pytest tests/ -v
 
-# Run tests with coverage
+# Run with coverage report
 python -m pytest tests/ -v --cov=core --cov-report=html
-
-# Run specific test file
-python -m pytest tests/test_auth.py -v
 ```
 
-**Current Coverage:** 94.4% (134/142 tests passing)
+### Test Specific Components
 
----
+```bash
+# Test authentication
+python -m pytest tests/test_auth.py -v
 
-## 📜 License
+# Test scraper functionality
+python -m pytest tests/test_scraper.py -v
 
-MIT License - Use for educational purposes only. Users are responsible for compliance with LinkedIn's Terms of Service.
+# Test configuration
+python -m pytest tests/test_config.py -v
+```
