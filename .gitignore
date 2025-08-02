@@ -1,0 +1,95 @@
+# Environment Variables
+.env
+*.env
+credentials.env
+
+# Data Files
+Linkedin Alumni Scraper/data/person_locations/indonesia_names.csv
+Linkedin Alumni Scraper/data/scraping_result/*.csv
+Linkedin Alumni Scraper/data/*.csv
+
+# Python
+__pycache__/
+Linkedin Alumni Scraper/__pycache__
+Linkedin Alumni Scraper/formatter/__pycache__
+Linkedin Alumni Scraper/core/__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environments
+venv/
+env/
+new_env/
+.venv
+ENV/
+env.bak/
+venv.bak/
+
+# Scraped Data (keep structure but ignore sensitive data)
+data/*.csv
+data/scraping_result/*.csv
+data/scraping_progress.txt
+Linkedin Alumni Scraper/data/*.csv
+Linkedin Alumni Scraper/data/scraping_result/*.csv
+
+# Logs (centralized in Alumni Scraper folder)
+Linkedin Alumni Scraper/logs/
+logs/
+*.log
+
+# IDE and Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+temp/
+tmp/
+*.tmp
+*.temp
+
+# Node.js (for frontend)
+node_modules/
+Linkedin Alumni Scraper/frontend/node_modules/
+Linkedin Alumni Scraper/frontend/dist/
+.npmrc
+
+# Test files (keep professional unit tests)
+tests/test_*.pyc
+tests/__pycache__/
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
