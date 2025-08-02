@@ -19,11 +19,11 @@ Features:
 from typing import Dict, Any, Optional
 import threading
 
-from .config import config, ConfigManager
-from .driver import LinkedInDriver
-from .auth import LinkedInAuth
-from .session import ScrapingSession, SessionManager, session_manager
-from .scraper import LinkedInScraper, ClassDetector, ProfileExtractor
+from core.config import config, ConfigManager
+from core.driver import LinkedInDriver
+from core.auth import LinkedInAuth
+from core.session import ScrapingSession, SessionManager, session_manager
+from core.scraper import LinkedInScraper, ClassDetector, ProfileExtractor
 
 
 class ServiceFactory:

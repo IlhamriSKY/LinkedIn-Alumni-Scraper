@@ -27,11 +27,11 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from typing import List, Dict, Any, Optional, Tuple
 
-from .config import config
-from .driver import LinkedInDriver
-from .auth import LinkedInAuth
-from .session import ScrapingSession, session_manager
-from .data_processor import data_processor
+from core.config import config
+from core.driver import LinkedInDriver
+from core.auth import LinkedInAuth
+from core.session import ScrapingSession, session_manager
+from core.data_processor import data_processor
 
 
 class ClassDetector:

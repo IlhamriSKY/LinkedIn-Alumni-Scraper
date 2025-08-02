@@ -27,7 +27,7 @@ from selenium.common.exceptions import WebDriverException, TimeoutException
 from typing import Optional, Tuple
 from datetime import datetime
 
-from .config import config
+from core.config import config
 
 
 class LinkedInDriver:

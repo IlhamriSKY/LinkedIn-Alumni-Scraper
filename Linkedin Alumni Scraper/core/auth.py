@@ -21,9 +21,9 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 from typing import Optional
 
-from .config import config
-from .driver import LinkedInDriver
-from .logging_utils import get_error_logger
+from core.config import config
+from core.driver import LinkedInDriver
+from core.logging_utils import get_error_logger
 
 
 class LinkedInAuth:

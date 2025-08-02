@@ -20,15 +20,15 @@ Features:
     - Professional session management
 """
 
-from .config import config, ConfigManager
-from .driver import LinkedInDriver
-from .auth import LinkedInAuth
-from .session import ScrapingSession, SessionManager, session_manager
-from .scraper import LinkedInScraper, ClassDetector, ProfileExtractor
-from .login_checker import LoginStatusChecker
-from .data_processor import DataProcessor, data_processor
-from .logging_utils import get_error_logger, get_scraping_logger, scraping_logger, LoggerMixin
-from .factory import (
+from core.config import config, ConfigManager
+from core.driver import LinkedInDriver
+from core.auth import LinkedInAuth
+from core.session import ScrapingSession, SessionManager, session_manager
+from core.scraper import LinkedInScraper, ClassDetector, ProfileExtractor
+from core.login_checker import LoginStatusChecker
+from core.data_processor import DataProcessor, data_processor
+from core.logging_utils import get_error_logger, get_scraping_logger, scraping_logger, LoggerMixin
+from core.factory import (
     ServiceFactory, ServiceContext, service_factory,
     get_scraper, get_driver_manager, get_auth_manager, 
     get_session_manager, cleanup_all, get_service_status

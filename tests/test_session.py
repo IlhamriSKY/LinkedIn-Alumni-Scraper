@@ -41,7 +41,7 @@ class TestSessionManagement(unittest.TestCase):
                     'domain': '.linkedin.com'
                 }
             ],
-            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'timestamp': '2024-01-01T00:00:00Z'
         }
     

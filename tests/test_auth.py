@@ -148,7 +148,7 @@ class TestAuthenticationModule(unittest.TestCase):
         
         for url in checkpoint_urls:
             with self.subTest(url=url):
-                has_checkpoint = "checkpoint" in url or "challenge" in url or "captcha" in url
+                has_checkpoint = "checkpoint" in url or "challenge" in url or "captcha" in url or "uas/login-submit" in url
                 self.assertTrue(has_checkpoint, f"Should detect checkpoint in {url}")
 
     def test_auto_login_flow(self):

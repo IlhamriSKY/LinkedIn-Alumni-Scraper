@@ -7,6 +7,7 @@ import { defineConfig, loadEnv } from 'vite'
 export default defineConfig(({ mode }) => {
   // Load env file from parent directory
   const env = loadEnv(mode, path.resolve(__dirname, '../../'), '')
+  // Get Flask port from .env FLASK_PORT and expose it as VITE_FLASK_PORT for frontend
   const FLASK_PORT = env.FLASK_PORT || '5000'
   
   return {

@@ -6,7 +6,7 @@ Tests Chrome WebDriver initialization, configuration, anti-detection measures, a
 """
 
 import unittest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch, MagicMock, PropertyMock
 import sys
 import os
 import time
@@ -19,7 +19,7 @@ sys.path.insert(0, PROJECT_ROOT)
 sys.path.insert(0, os.path.join(PROJECT_ROOT, 'Linkedin Alumni Scraper'))
 sys.path.insert(0, os.path.join(PROJECT_ROOT, 'Linkedin Alumni Scraper', 'core'))
 
-from driver import LinkedInDriver
+from core.driver import LinkedInDriver
 
 
 class TestLinkedInDriver(unittest.TestCase):
@@ -33,7 +33,7 @@ class TestLinkedInDriver(unittest.TestCase):
         """Clean up test fixtures."""
         try:
             if hasattr(self.driver_manager, '_driver') and self.driver_manager._driver:
-                self.driver_manager.quit_driver()
+                self.driver_manager.cleanup()
         except:
             pass
     
@@ -134,7 +134,8 @@ class TestLinkedInDriver(unittest.TestCase):
     def test_is_driver_alive_with_dead_driver(self):
         """Test driver alive check with dead driver."""
         mock_driver = Mock()
-        mock_driver.current_url.side_effect = Exception("Driver session dead")
+        # Configure the mock to raise exception on property access  
+        type(mock_driver).current_url = PropertyMock(side_effect=Exception("Driver session dead"))
         
         self.driver_manager._driver = mock_driver
         self.driver_manager._driver_initialized = True
@@ -174,16 +175,18 @@ class TestLinkedInDriver(unittest.TestCase):
         # Verify navigation
         mock_driver.get.assert_called_with(test_url)
     
+    @patch('core.driver.config.get_delay_config')
     @patch('driver.uc.Chrome')
     @patch('driver.uc.ChromeOptions')
-    def test_human_delay(self, mock_options, mock_chrome):
+    def test_human_delay(self, mock_options, mock_chrome, mock_delay_config):
         """Test human-like delay functionality."""
         mock_driver = Mock()
         mock_chrome.return_value = mock_driver
+        mock_delay_config.return_value = (0.1, 0.2)  # Mock delay range
         
         # Test delay range
         start_time = time.time()
-        self.driver_manager.human_delay(0.1, 0.2)
+        self.driver_manager.random_delay('action')
         end_time = time.time()
         
         # Verify delay was applied
@@ -202,12 +205,12 @@ class TestLinkedInDriver(unittest.TestCase):
         
         mock_chrome.return_value = mock_driver
         
-        with patch('driver.WebDriverWait', return_value=mock_wait):
+        with patch('core.driver.WebDriverWait', return_value=mock_wait):
             # Initialize driver
             self.driver_manager._initialize_driver()
             
             # Wait for element
-            element = self.driver_manager.wait_for_element("//div[@class='test']", 10)
+            element = self.driver_manager.wait_for_element(("xpath", "//div[@class='test']"), 10)
             
             # Verify element found
             self.assertIsNotNone(element)
@@ -215,14 +218,14 @@ class TestLinkedInDriver(unittest.TestCase):
     
     @patch('driver.uc.Chrome')
     @patch('driver.uc.ChromeOptions')
-    def test_quit_driver_success(self, mock_options, mock_chrome):
-        """Test successful driver quit operation."""
+    def test_cleanup_success(self, mock_options, mock_chrome):
+        """Test successful driver cleanup operation."""
         mock_driver = Mock()
         mock_chrome.return_value = mock_driver
         
-        # Create and quit driver
+        # Create and cleanup driver
         self.driver_manager._initialize_driver()
-        self.driver_manager.quit_driver()
+        self.driver_manager.cleanup()
         
         # Verify quit was called
         mock_driver.quit.assert_called_once()
@@ -231,18 +234,18 @@ class TestLinkedInDriver(unittest.TestCase):
         self.assertIsNone(self.driver_manager._driver)
         self.assertFalse(self.driver_manager._driver_initialized)
     
-    def test_quit_driver_no_driver(self):
-        """Test quit driver when no driver exists."""
-        # Attempt to quit non-existent driver
-        result = self.driver_manager.quit_driver()
+    def test_cleanup_no_driver(self):
+        """Test cleanup when no driver exists."""
+        # Attempt to cleanup non-existent driver
+        result = self.driver_manager.cleanup()
         
         # Should handle gracefully
         self.assertIsNone(result)
     
     @patch('driver.uc.Chrome')
     @patch('driver.uc.ChromeOptions')
-    def test_quit_driver_exception_handling(self, mock_options, mock_chrome):
-        """Test driver quit with exception handling."""
+    def test_cleanup_exception_handling(self, mock_options, mock_chrome):
+        """Test driver cleanup with exception handling."""
         mock_driver = Mock()
         mock_driver.quit.side_effect = Exception("Quit failed")
         mock_chrome.return_value = mock_driver
@@ -250,8 +253,8 @@ class TestLinkedInDriver(unittest.TestCase):
         # Create driver
         self.driver_manager._initialize_driver()
         
-        # Quit driver (should handle exception)
-        self.driver_manager.quit_driver()
+        # Cleanup driver (should handle exception)
+        self.driver_manager.cleanup()
         
         # Verify driver reference is still cleared
         self.assertIsNone(self.driver_manager._driver)
@@ -275,8 +278,8 @@ class TestLinkedInDriver(unittest.TestCase):
         retrieved_driver = self.driver_manager.get_driver()
         self.assertEqual(retrieved_driver, mock_driver)
         
-        # 3. Quit driver
-        self.driver_manager.quit_driver()
+        # 3. Cleanup driver
+        self.driver_manager.cleanup()
         self.assertIsNone(self.driver_manager._driver)
         self.assertFalse(self.driver_manager._driver_initialized)
         
@@ -289,7 +292,7 @@ class TestLinkedInDriver(unittest.TestCase):
         
         # Verify logger is created
         self.assertIsNotNone(logger)
-        self.assertEqual(logger.name, f"tests.test_driver.LinkedInDriver")
+        self.assertEqual(logger.name, f"core.driver.LinkedInDriver")
 
 
 if __name__ == '__main__':

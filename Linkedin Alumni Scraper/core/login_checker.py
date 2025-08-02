@@ -20,8 +20,8 @@ from datetime import datetime
 from typing import Dict, Any
 
 # Import specific classes to avoid circular imports
-from .factory import service_factory
-from .config import config
+from core.factory import service_factory
+from core.config import config
 
 
 class LoginStatusChecker:

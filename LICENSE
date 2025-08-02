@@ -1,11 +1,11 @@
 MIT License
 
-Copyright (c) 2025 LinkedIn Alumni Scraper
+Copyright (c) 2025 IlhamriSKY - LinkedIn Alumni Scraper
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
 in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+to use, copy, modify, merge, publish, distribute, sublicense, and/sell
 copies of the Software, and to permit persons to whom the Software is
 furnished to do so, subject to the following conditions:
 
@@ -22,10 +22,27 @@ SOFTWARE.
 
 ---
 
-DISCLAIMER: 
+## 🚨 IMPORTANT DISCLAIMER
+
 This software is built upon the original LinkedIn Scraper project by 
 @notyouriiz (https://github.com/notyouriiz/Linkedin_Scraper). 
 
-Web scraping LinkedIn may violate their Terms of Service. Users assume 
-full responsibility for compliance with applicable laws and terms of service.
-USE AT YOUR OWN RISK.
+### ⚠️ Legal Notice
+
+**Web scraping LinkedIn may violate their Terms of Service.**
+
+By using this software, you acknowledge and agree that:
+
+- 🚫 You use this tool at your own risk
+- ⚖️ You are fully responsible for compliance with all applicable laws
+- 📋 You must comply with LinkedIn's Terms of Service  
+- 🎓 This tool is intended for educational purposes only
+- 🛡️ The authors are not liable for any consequences of use
+
+### 🔗 Links
+
+- **Original Project**: https://github.com/notyouriiz/Linkedin_Scraper
+- **Enhanced Version**: https://github.com/IlhamriSKY/LinkedIn-Alumni-Scraper
+- **Documentation**: See README.md for full details
+
+**USE AT YOUR OWN RISK** - You assume full responsibility for any consequences.

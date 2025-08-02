@@ -19,7 +19,7 @@ import pandas as pd
 import ast
 import os
 from typing import Optional, Any, Dict, List
-from .config import config
+from core.config import config
 
 
 class DataProcessor:
