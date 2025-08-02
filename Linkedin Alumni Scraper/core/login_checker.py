@@ -86,7 +86,7 @@ class LoginStatusChecker:
                 if verbose:
                     print("[INFO] Browser driver is not active")
                     print("[WARN] Cannot check login status without active browser")
-                    print("[INFO] Start browser first with: python run.py --modern")
+                    print("[INFO] Start browser first with: python app.py")
                     print("=" * 60)
                 
                 return result
@@ -150,7 +150,7 @@ class LoginStatusChecker:
             print()
             print("[WARN] Not logged in to LinkedIn")
             print("[INFO] You need to login first:")
-            print("  1. Start the modern API: python run.py --modern")
+            print("  1. Start the API server: python app.py")
             print("  2. Use auto-login: POST /api/auth/auto-login")
             print("  3. Or manual login: POST /api/auth/manual-login")
         
