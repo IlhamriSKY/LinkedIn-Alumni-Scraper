@@ -86,9 +86,6 @@ cd LinkedIn-Alumni-Scraper
 python start.py
 ```
 
-<details>
-<summary>📋 Manual Installation Steps</summary>
-
 ## 📖 Installation
 
 ### 1️⃣ Setup Virtual Environment
@@ -148,8 +145,6 @@ cp "Linkedin Alumni Scraper/data/person_locations/indonesia_names_example.csv" "
 # ✏️ Edit the CSV file with names you want to scrape
 ```
 
-</details>
-
 ---
 
 ## 🎮 Running the Application
@@ -168,9 +163,6 @@ python start.py
 
 ### ⚙️ Option 2: Manual Start
 
-<details>
-<summary>Click to expand manual startup instructions</summary>
-
 ```bash
 # 🔧 Terminal 1 - Backend Server
 cd "Linkedin Alumni Scraper"
@@ -180,8 +172,6 @@ python app.py
 cd "Linkedin Alumni Scraper/frontend"
 npm run dev
 ```
-
-</details>
 
 ### 🌐 Access Points
 
