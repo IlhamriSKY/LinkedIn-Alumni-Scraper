@@ -128,6 +128,7 @@ class LinkedInDriver:
     def _is_driver_alive(self) -> bool:
         """
         Check if the current driver session is alive and responsive.
+        Uses a safer method that doesn't trigger page refresh.
         
         Returns:
             True if driver is alive, False otherwise
@@ -136,8 +137,9 @@ class LinkedInDriver:
             return False
         
         try:
-            # Quick test - check current URL
-            _ = self._driver.current_url
+            # Use window_handles instead of current_url to avoid triggering refresh
+            # This is a safer check that doesn't interact with the page content
+            _ = self._driver.window_handles
             return True
         except Exception:
             return False
@@ -301,6 +303,36 @@ class LinkedInDriver:
         except Exception as e:
             self._logger.error(f"Failed to close extra tabs: {e}")
     
+    def is_browser_responsive(self) -> bool:
+        """
+        Check if browser is responsive without triggering refresh.
+        Uses safe operations that don't interact with page content.
+        
+        Returns:
+            True if browser is responsive, False otherwise
+        """
+        try:
+            if not self._driver or not self._driver_initialized:
+                return False
+            
+            # Safe check - get window handles (doesn't interact with page)
+            handles = self._driver.window_handles
+            
+            # Check if we have at least one window
+            if not handles:
+                return False
+            
+            # Try to get window size (safe operation)
+            try:
+                _ = self._driver.get_window_size()
+                return True
+            except Exception:
+                return False
+                
+        except Exception as e:
+            self._logger.debug(f"Browser responsiveness check failed: {e}")
+            return False
+
     def get_status(self) -> dict:
         """
         Get current browser status.
@@ -317,13 +349,21 @@ class LinkedInDriver:
                     'window_count': 0
                 }
             
-            is_alive = self._is_driver_alive()
+            is_alive = self.is_browser_responsive()  # Use safer method
             
             if is_alive:
+                # Get current_url safely without triggering refresh
+                try:
+                    current_url = self._driver.current_url
+                except Exception as url_error:
+                    # If current_url fails, don't fail the entire status check
+                    self._logger.warning(f"Could not get current URL: {url_error}")
+                    current_url = "unknown"
+                
                 return {
                     'status': 'active',
                     'is_alive': True,
-                    'current_url': self._driver.current_url,
+                    'current_url': current_url,
                     'window_count': len(self._driver.window_handles)
                 }
             else:

@@ -149,14 +149,30 @@ class APIService:
                 
                 is_open = True
                 
-                # Quick responsiveness test
+                # Use safer browser responsiveness check
                 try:
-                    current_url = self.driver_manager.driver.current_url
-                    is_alive = True
+                    # Use window_handles and window size instead of current_url to avoid refresh
+                    handles = self.driver_manager.driver.window_handles
+                    if handles:
+                        _ = self.driver_manager.driver.get_window_size()
+                        is_alive = True
+                        
+                        # Only get current_url if specifically needed and safe
+                        try:
+                            current_url = self.driver_manager.driver.current_url
+                        except Exception as url_error:
+                            print(f"[DEBUG] Could not get current URL (safe): {url_error}")
+                            current_url = "browser_active"
+                    else:
+                        is_alive = False
                     
                     # Only check login status if browser is alive and we have auth manager
-                    if self.auth_manager:
-                        is_logged_in = self.auth_manager.is_logged_in()
+                    if is_alive and self.auth_manager:
+                        try:
+                            is_logged_in = self.auth_manager.is_logged_in()
+                        except Exception as auth_error:
+                            print(f"[DEBUG] Auth check failed: {auth_error}")
+                            is_logged_in = False
                         
                 except Exception as driver_error:
                     # Browser window might be closed or unresponsive

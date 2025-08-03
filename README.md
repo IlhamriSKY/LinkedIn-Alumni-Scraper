@@ -129,7 +129,7 @@ LINKEDIN_EMAIL=your_email@example.com
 LINKEDIN_PASSWORD=your_secure_password
 
 # ⚙️ Application Settings  
-FLASK_PORT=5000                    # Backend server port
+FLASK_PORT=5000     
 
 # 🎓 University Information
 UNIVERSITY_LINKEDIN_ID=your-university-linkedin-id

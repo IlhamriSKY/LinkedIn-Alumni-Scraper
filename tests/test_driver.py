@@ -123,7 +123,7 @@ class TestLinkedInDriver(unittest.TestCase):
     def test_is_driver_alive_with_working_driver(self):
         """Test driver alive check with working driver."""
         mock_driver = Mock()
-        mock_driver.current_url = "https://www.linkedin.com"
+        mock_driver.window_handles = ["window1"]  # Simulate working browser with window handles
         
         self.driver_manager._driver = mock_driver
         self.driver_manager._driver_initialized = True
@@ -131,11 +131,40 @@ class TestLinkedInDriver(unittest.TestCase):
         result = self.driver_manager._is_driver_alive()
         self.assertTrue(result)
     
+    def test_is_browser_responsive_no_driver(self):
+        """Test browser responsive check when no driver exists."""
+        result = self.driver_manager.is_browser_responsive()
+        self.assertFalse(result)
+    
+    def test_is_browser_responsive_with_working_browser(self):
+        """Test browser responsive check with working browser."""
+        mock_driver = Mock()
+        mock_driver.window_handles = ["window1"]
+        mock_driver.get_window_size.return_value = {"width": 1920, "height": 1080}
+        
+        self.driver_manager._driver = mock_driver
+        self.driver_manager._driver_initialized = True
+        
+        result = self.driver_manager.is_browser_responsive()
+        self.assertTrue(result)
+    
+    def test_is_browser_responsive_with_unresponsive_browser(self):
+        """Test browser responsive check with unresponsive browser."""
+        mock_driver = Mock()
+        mock_driver.window_handles = ["window1"]
+        mock_driver.get_window_size.side_effect = Exception("Browser unresponsive")
+        
+        self.driver_manager._driver = mock_driver
+        self.driver_manager._driver_initialized = True
+        
+        result = self.driver_manager.is_browser_responsive()
+        self.assertFalse(result)
+    
     def test_is_driver_alive_with_dead_driver(self):
         """Test driver alive check with dead driver."""
         mock_driver = Mock()
-        # Configure the mock to raise exception on property access  
-        type(mock_driver).current_url = PropertyMock(side_effect=Exception("Driver session dead"))
+        # Configure the mock to raise exception on window_handles access (new implementation)
+        type(mock_driver).window_handles = PropertyMock(side_effect=Exception("Driver session dead"))
         
         self.driver_manager._driver = mock_driver
         self.driver_manager._driver_initialized = True

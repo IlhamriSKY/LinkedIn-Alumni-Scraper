@@ -237,7 +237,7 @@
             >
               <svg v-if="loading.browser" class="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 0 1 4 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
               </svg>
               <svg v-else class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
@@ -286,6 +286,9 @@
         @update-current-page="updateCurrentPage"
       />
     </main>
+    
+    <!-- Toast Container -->
+    <ToastContainer />
   </div>
 </template>
 
@@ -299,8 +302,12 @@ import LoginSection from '@/components/LoginSection.vue'
 import ScrapingControl from '@/components/ScrapingControl.vue'
 import ProgressDisplay from '@/components/ProgressDisplay.vue'
 import ResultsTable from '@/components/ResultsTable.vue'
+import ToastContainer from '@/components/ToastContainer.vue'
 import { api, apiRetry } from '@/utils/api'
-import { toast } from 'vue-sonner'
+import { useToast } from '@/composables/useToast'
+
+// Toast management
+const toast = useToast()
 
 // State Management
 const backendConnected = ref(false)
@@ -375,19 +382,31 @@ const startAutoUpdate = () => {
   
   updateInterval = setInterval(async () => {
     try {
-      if (!loading.value.browser) {
-        await fetchUniversityInfo()
-        await fetchBrowserStatus()
-        await fetchLoginStatus()
-        await fetchStats()
-        if (!scrapingStatus.value.is_running) {
-          await fetchResults()
-        }
+      // Skip updates if any critical process is running to avoid interference
+      if (loading.value.browser || loading.value.login || loading.value.scraping) {
+        return
       }
+      
+      // Fetch status updates in order of importance
+      await fetchBrowserStatus()
+      await fetchLoginStatus()
+      
+      // Only fetch heavy operations if not actively scraping
+      if (!scrapingStatus.value.is_running) {
+        await fetchStats()
+        await fetchResults()
+      }
+      
+      // University info is rarely changed, fetch less frequently
+      if (Math.random() < 0.1) { // ~10% chance each cycle
+        await fetchUniversityInfo()
+      }
+      
     } catch (error) {
       console.error('[ERROR] Auto-update failed:', error)
+      // Continue polling even if one update fails
     }
-  }, 30000)
+  }, 15000) // Faster polling for better UX (15 seconds instead of 30)
 }
 
 const stopAutoUpdate = () => {
@@ -413,7 +432,14 @@ const fetchBrowserStatus = async () => {
   try {
     const data = await apiCallWithStatus(() => api.getBrowserStatus())
     if (data.success) {
+      const previousStatus = browserStatus.value.is_alive
       browserStatus.value = data.data
+      
+      // Detect browser close and set manual close flag
+      if (previousStatus && !browserStatus.value.is_alive && !loading.value.browser) {
+        browserManuallyClosed.value = true
+        toast.warning('Browser Closed', 'Browser was closed. Open manually when ready to continue.')
+      }
     }
   } catch (error) {
     console.error('Error fetching browser status:', error)
@@ -492,18 +518,20 @@ const openBrowser = async () => {
   try {
     const data = await apiRetry(() => api.openBrowser(), 2, 2000)
     if (data.success) {
-      toast.success(data.message)
+      // Show success toast when browser opens
+      toast.success('Browser Opened', 'LinkedIn browser has been opened successfully!')
+      browserManuallyClosed.value = false // Reset manual close flag
     } else {
-      toast.error(data.message || 'Failed to open browser')
+      toast.error('Failed to Open Browser', data.message || 'Failed to open browser')
     }
   } catch (error) {
     console.error('Error opening browser:', error)
     if (error.message && error.message.includes('timeout')) {
-      toast.error('Browser opening timed out. Please check if backend is running.')
+      toast.error('Browser Opening Timeout', 'Please check if backend is running.')
     } else if (error.message && error.message.includes('Cannot connect to backend')) {
-      toast.error('Cannot connect to backend. Please make sure the backend server is running.')
+      toast.error('Backend Connection Failed', 'Please make sure the backend server is running.')
     } else {
-      toast.error(`Error opening browser: ${error.message || 'Unknown error occurred'}`)
+      toast.error('Browser Opening Error', error.message || 'Unknown error occurred')
     }
   } finally {
     loading.value.browser = false
@@ -517,7 +545,7 @@ const performManualLogin = async () => {
   
   try {
     if (browserManuallyClosed.value) {
-      toast.warn('Please open browser manually first before attempting login.')
+      toast.warning('Browser Required', 'Please open browser manually first before attempting login.')
       loading.value.login = false
       loginProgress.value = { step: 0, message: 'Browser required - open manually' }
       return
@@ -526,6 +554,7 @@ const performManualLogin = async () => {
     loginProgress.value = { step: 1, message: 'Checking current login status...' }
     const alreadyLoggedIn = await fetchLoginStatus()
     if (alreadyLoggedIn) {
+      toast.success('Already Logged In', 'You are already logged in to LinkedIn!')
       loading.value.login = false
       return
     }
@@ -534,14 +563,14 @@ const performManualLogin = async () => {
     const data = await api.manualLogin()
     
     if (data.success) {
-      toast.success('LinkedIn login page opened in browser. Starting auto-login...')
+      toast.success('Login Process Started', 'LinkedIn login page opened. Starting auto-login...')
       
       loginProgress.value = { step: 3, message: 'Auto-typing credentials and logging in...' }
       const autoLoginResult = await api.autoLogin()
       
       if (autoLoginResult.success) {
         loginProgress.value = { step: 4, message: 'Verifying login success...' }
-        toast.success('Auto-login initiated! Verifying login status...')
+        toast.info('Verifying Login', 'Checking login status...')
         
         // Poll for login completion
         let attempts = 0
@@ -554,27 +583,27 @@ const performManualLogin = async () => {
             clearInterval(pollInterval)
             loading.value.login = false
             loginProgress.value = { step: 0, message: 'Successfully logged in!' }
-            toast.success('✅ Successfully connected to LinkedIn!')
+            toast.success('Login Successful', 'Successfully connected to LinkedIn!')
           } else if (attempts >= maxAttempts) {
             clearInterval(pollInterval)
             loading.value.login = false
             loginProgress.value = { step: 0, message: 'Login timeout' }
-            toast.error('Login verification timed out. Please check manually.')
+            toast.warning('Login Timeout', 'Login verification timed out. Please check manually in browser.')
           }
         }, 5000)
       } else {
-        toast.error('Auto login failed. Please login manually in the browser.')
+        toast.error('Auto Login Failed', 'Please login manually in the browser.')
         loading.value.login = false
         loginProgress.value = { step: 0, message: 'Login failed' }
       }
     } else {
-      toast.error(`Login failed: ${data.error}`)
+      toast.error('Login Failed', data.error || 'Failed to open LinkedIn page')
       loading.value.login = false
       loginProgress.value = { step: 0, message: 'Failed to open LinkedIn page' }
     }
   } catch (error) {
     console.error('[ERROR] Error during manual login:', error)
-    toast.error(`Network error: ${error.message}`)
+    toast.error('Network Error', error.message || 'Network error occurred')
     loading.value.login = false
     loginProgress.value = { step: 0, message: 'Network error occurred' }
   }
@@ -609,11 +638,13 @@ const autoDetectClasses = async () => {
     if (data.success) {
       scrapingConfig.value.location_class = data.location_class || ''
       scrapingConfig.value.section_class = data.section_class || ''
-      toast.success('CSS classes detected successfully!')
+      toast.success('CSS Detection Complete', 'CSS classes detected and updated successfully!')
+    } else {
+      toast.error('CSS Detection Failed', data.error || 'Failed to detect CSS classes')
     }
   } catch (error) {
     console.error('Error detecting classes:', error)
-    toast.error('Failed to detect CSS classes')
+    toast.error('CSS Detection Error', error.message || 'Failed to detect CSS classes')
   } finally {
     loading.value.cssDetection = false
   }
@@ -621,7 +652,7 @@ const autoDetectClasses = async () => {
 
 const startScraping = async () => {
   if (browserManuallyClosed.value) {
-    toast.warn('Browser is required for scraping. Please open browser manually first.')
+    toast.warning('Browser Required', 'Browser is required for scraping. Please open browser manually first.')
     return
   }
   
@@ -629,15 +660,15 @@ const startScraping = async () => {
   try {
     const data = await api.startScraping(scrapingConfig.value)
     if (data.success) {
-      toast.success('Scraping started successfully!')
+      toast.success('Scraping Started', 'LinkedIn alumni scraping has been started successfully!')
       scrapingStatus.value.is_running = true
     } else {
       console.error('❌ Failed to start scraping:', data.error)
-      toast.error(`Failed to start scraping: ${data.error}`)
+      toast.error('Scraping Failed', data.error || 'Failed to start scraping process')
     }
   } catch (error) {
     console.error('Error starting scraping:', error)
-    toast.error(`Error starting scraping: ${error.message}`)
+    toast.error('Scraping Error', error.message || 'Error starting scraping process')
   } finally {
     loading.value.scraping = false
   }

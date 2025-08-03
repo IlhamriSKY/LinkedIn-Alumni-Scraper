@@ -1,6 +1,6 @@
 <template>
   <!-- LinkedIn Authentication Section -->
-  <Card v-if="!loginStatus.logged_in" class="border-destructive/50">
+  <Card v-if="!props.loginStatus.logged_in" class="border-destructive/50">
     <CardHeader>
       <CardTitle class="flex items-center space-x-2">
         <svg class="h-5 w-5 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
@@ -11,21 +11,21 @@
     </CardHeader>
     <CardContent class="space-y-6">
       <!-- Login Progress Indicator -->
-      <div v-if="loading.login" class="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+      <div v-if="props.loading.login" class="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
         <div class="flex items-center space-x-3">
           <svg class="animate-spin h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 0 1 4 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
           </svg>
           <div class="flex-1">
             <p class="font-medium text-blue-900 dark:text-blue-100">{{ getLoginStatusText() }}</p>
             <div class="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2 mt-2">
               <div 
                 class="bg-blue-600 h-2 rounded-full transition-all duration-500"
-                :style="{ width: (loginProgress.step * 20) + '%' }"
+                :style="{ width: ((props.loginProgress?.step || 0) * 20) + '%' }"
               ></div>
             </div>
-            <p class="text-sm text-blue-700 dark:text-blue-300 mt-1">{{ loginProgress.message }}</p>
+            <p class="text-sm text-blue-700 dark:text-blue-300 mt-1">{{ props.loginProgress?.message || 'Processing...' }}</p>
           </div>
         </div>
       </div>
@@ -48,40 +48,40 @@
       </div>
     </CardContent>
     <CardFooter class="flex flex-col space-y-3">
-      <!-- Manual Login Button -->
+      <!-- Auto Login Button -->
       <Button 
         @click="performManualLogin"
-        :disabled="loading.login || browserManuallyClosed"
+        :disabled="props.loading.login || props.browserManuallyClosed"
         variant="default"
         size="lg"
         class="w-full bg-blue-600 hover:bg-blue-700 text-white"
       >
-        <svg v-if="loading.login" class="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
+        <svg v-if="props.loading.login" class="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 0 1 4 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
         </svg>
         <svg v-else class="mr-2 h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
           <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
         </svg>
-        {{ browserManuallyClosed ? 'Open Browser First' : loading.login ? getLoginStatusText() : 'Login to LinkedIn' }}
+        {{ props.browserManuallyClosed ? 'Open Browser First' : props.loading.login ? getLoginStatusText() : 'Login to LinkedIn' }}
       </Button>
 
       <!-- Manual Check Button -->
       <Button 
         @click="manualCheckLogin"
-        :disabled="loading.manualCheck"
+        :disabled="props.loading.manualCheck"
         variant="outline"  
         size="sm"
         class="w-full"
       >
-        <svg v-if="loading.manualCheck" class="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
+        <svg v-if="props.loading.manualCheck" class="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 0 1 4 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
         </svg>
         <svg v-else class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
         </svg>
-        {{ loading.manualCheck ? 'Checking...' : 'Check Login Status' }}
+        {{ props.loading.manualCheck ? 'Checking...' : 'Check Login Status' }}
       </Button>
     </CardFooter>
   </Card>
@@ -91,11 +91,23 @@
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 
-defineProps({
-  loginStatus: Object,
-  loading: Object,
-  browserManuallyClosed: Boolean,
-  loginProgress: Object
+const props = defineProps({
+  loginStatus: {
+    type: Object,
+    default: () => ({ logged_in: false, university: '', linkedin_url: '' })
+  },
+  loading: {
+    type: Object,
+    default: () => ({ login: false, cssDetection: false, scraping: false, manualCheck: false, browser: false })
+  },
+  browserManuallyClosed: {
+    type: Boolean,
+    default: false
+  },
+  loginProgress: {
+    type: Object,
+    default: () => ({ step: 0, message: 'Initializing...' })
+  }
 })
 
 const emit = defineEmits(['performManualLogin', 'manualCheckLogin'])
@@ -111,6 +123,6 @@ const getLoginStatusText = () => {
     'Logging in...',
     'Verifying login...'
   ]
-  return messages[loginProgress.step] || 'Authenticating...'
+  return messages[props.loginProgress?.step || 0] || 'Authenticating...'
 }
 </script>
