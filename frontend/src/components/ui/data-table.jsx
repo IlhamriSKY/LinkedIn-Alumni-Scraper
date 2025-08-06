@@ -159,7 +159,7 @@ export const columns = [
     cell: ({ row }) => {
       const bio = row.getValue("bio") || row.original.Bio || ""
       return (
-        <div className="max-w-[200px]">
+        <div className="max-w-[500px]">
           <span className="text-xs text-muted-foreground truncate" title={bio}>
             {bio.length > 50 ? bio.substring(0, 50) + "..." : bio || "N/A"}
           </span>

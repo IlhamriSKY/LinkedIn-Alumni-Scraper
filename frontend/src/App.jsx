@@ -9,6 +9,7 @@ import { ThemeToggle } from '@/components/theme-toggle'
 import { StatusIndicator } from '@/components/ui/status-indicator'
 import { LoginSteps } from '@/components/ui/login-steps'
 import { AlumniDataTable } from '@/components/ui/alumni-data-table'
+import { LoadingButton, LoadingInline, LoadingDots } from '@/components/ui/loading-spinner'
 import { toast } from '@/hooks/use-toast'
 import { Toaster } from '@/components/ui/toaster'
 import { 
@@ -25,6 +26,8 @@ import {
   GraduationCap,
   UserCheck,
   UserX,
+  Home,
+  User,
   Eye
 } from 'lucide-react'
 
@@ -669,6 +672,93 @@ class App extends React.Component {
     }
   }
 
+  handleNavigateToProfile = async () => {
+    console.log('Navigating to user profile...');
+    this.setState({ isNavigating: true });
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/navigate-profile`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      const result = await response.json();
+      console.log('Profile navigation result:', result);
+      
+      if (result.success) {
+        this.showToast('success', 'Navigation Successful', 'Navigated to your profile page');
+      } else {
+        console.error('Navigation failed:', result.message);
+        this.showToast('destructive', 'Navigation Error', result.message || 'Failed to navigate to profile page');
+      }
+    } catch (error) {
+      console.error('Error navigating to profile:', error);
+      this.showToast('destructive', 'Navigation Error', 'Failed to navigate to profile page');
+    } finally {
+      this.setState({ isNavigating: false });
+    }
+  }
+
+  handleNavigateToProfile = async () => {
+    console.log('Navigating to user profile...');
+    this.setState({ isNavigating: true });
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/navigate-profile`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      const result = await response.json();
+      console.log('Profile navigation result:', result);
+      
+      if (result.success) {
+        this.showToast('success', 'Navigation Successful', 'Navigated to your profile');
+      } else {
+        console.error('Navigation failed:', result.message);
+        this.showToast('destructive', 'Navigation Error', result.message || 'Failed to navigate to profile');
+      }
+    } catch (error) {
+      console.error('Error navigating to profile:', error);
+      this.showToast('destructive', 'Navigation Error', 'Failed to navigate to profile');
+    } finally {
+      this.setState({ isNavigating: false });
+    }
+  }
+
+  handleNavigateToFeed = async () => {
+    console.log('Navigating to LinkedIn feed...');
+    this.setState({ isNavigating: true });
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/navigate-feed`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      const result = await response.json();
+      console.log('Feed navigation result:', result);
+      
+      if (result.success) {
+        this.showToast('success', 'Navigation Successful', 'Navigated to LinkedIn feed');
+      } else {
+        console.error('Navigation failed:', result.message);
+        this.showToast('destructive', 'Navigation Error', result.message || 'Failed to navigate to feed');
+      }
+    } catch (error) {
+      console.error('Error navigating to feed:', error);
+      this.showToast('destructive', 'Navigation Error', 'Failed to navigate to feed');
+    } finally {
+      this.setState({ isNavigating: false });
+    }
+  }
+
   handleNavigateUniversity = async () => {
     console.log('Navigating to university...');
     this.setState({ isNavigating: true });
@@ -960,7 +1050,7 @@ class App extends React.Component {
                         <Badge variant={this.state.loginStatus === 'Logged In' ? 'default' : 'secondary'}>
                           {this.state.isLoggingIn ? (
                             <div className="flex items-center">
-                              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-current mr-1"></div>
+                              <LoadingInline size="xs" variant="secondary" className="mr-1" />
                               {this.state.loginStatus}
                             </div>
                           ) : (
@@ -973,7 +1063,7 @@ class App extends React.Component {
                         <div className="text-right">
                           {this.state.isNavigating ? (
                             <div className="flex items-center text-xs">
-                              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-current mr-1"></div>
+                              <LoadingInline size="xs" variant="secondary" className="mr-1" />
                               Navigating...
                             </div>
                           ) : (
@@ -1029,7 +1119,7 @@ class App extends React.Component {
                         >
                           {this.state.isLoggingIn ? (
                             <>
-                              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-green-600 mr-2"></div>
+                              <LoadingInline size="xs" variant="success" className="mr-2" />
                               {this.state.loginStatus === 'Checking Login...' ? 'Checking...' : 'Logging in...'}
                             </>
                           ) : (
@@ -1054,13 +1144,38 @@ class App extends React.Component {
                         >
                           {this.state.isNavigating ? (
                             <>
-                              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-2"></div>
+                              <LoadingInline size="xs" variant="white" className="mr-2" />
                               Navigating...
                             </>
                           ) : (
                             <>
                               <GraduationCap className="h-4 w-4 mr-1" />
                               Navigate to University
+                            </>
+                          )}
+                        </Button>
+                      )}
+
+                      {/* Navigate to Feed Button - Show when logged in and not on feed */}
+                      {this.state.browserStatus === 'Open' && 
+                       this.state.loginStatus === 'Logged In' && 
+                       !this.state.currentTab.url.includes('/feed') && (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={this.handleNavigateToFeed}
+                          disabled={this.state.isNavigating}
+                          className="bg-indigo-600 hover:bg-indigo-700 text-white border-0"
+                        >
+                          {this.state.isNavigating ? (
+                            <>
+                              <LoadingInline size="xs" variant="white" className="mr-2" />
+                              Navigating...
+                            </>
+                          ) : (
+                            <>
+                              <Home className="h-4 w-4 mr-1" />
+                              LinkedIn Feed
                             </>
                           )}
                         </Button>
@@ -1095,7 +1210,7 @@ class App extends React.Component {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <span>Progress</span>
-                        <span>{this.state.progressPercent.toFixed(1)}% ({this.state.scrapedCount + this.state.notFoundCount}/{this.state.totalSearchNames})</span>
+                        <span>{this.state.progressPercent.toFixed(1)}% ({this.state.scrapedCount}/{this.state.totalSearchNames})</span>
                       </div>
                       <Progress value={this.state.progressPercent} className="w-full" />
                       {this.state.lastScrapedName && (
@@ -1105,7 +1220,7 @@ class App extends React.Component {
                       )}
                       {this.state.currentCsvFile && this.state.scrapingStatus === 'Running' && (
                         <div className="text-xs text-green-600 dark:text-green-400 flex items-center">
-                          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse mr-2"></div>
+                          <LoadingDots size="sm" variant="success" className="mr-2" />
                           Real-time save: {this.state.currentCsvFile.split('/').pop() || this.state.currentCsvFile}
                         </div>
                       )}
@@ -1120,7 +1235,7 @@ class App extends React.Component {
                       >
                         {this.state.scrapingStatus === 'Running' ? (
                           <>
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-1"></div>
+                            <LoadingDots size="sm" variant="white" className="mr-2" />
                             Running Alumni Search
                           </>
                         ) : (
@@ -1158,7 +1273,7 @@ class App extends React.Component {
                 <AlumniDataTable 
                   data={this.state.alumniData}
                   title="Alumni Scraping Results"
-                  isLoading={this.state.scrapingStatus === 'Running'}
+                  isLoading={false}
                 />
                 </div>
               

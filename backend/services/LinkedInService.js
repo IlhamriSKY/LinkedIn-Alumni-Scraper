@@ -637,17 +637,24 @@ class LinkedInService {
       if (alumniProfiles.length > 0) {
         // Get the first (best match) profile
         const bestMatch = alumniProfiles[0];
-        console.log(`Found alumni profile: ${bestMatch.name}`);
+        console.log(`✅ ALUMNI SEARCH - Found alumni profile: ${bestMatch.name}`);
+        console.log(`🔗 ALUMNI SEARCH - Profile URL: ${bestMatch.profileUrl}`);
         
-        // Get detailed profile information
+        // Get detailed profile information by visiting the profile page
+        console.log(`📋 ALUMNI SEARCH - Getting detailed profile information...`);
         const detailedProfile = await this.getDetailedProfileInfo(bestMatch.profileUrl, bestMatch);
         
-        return {
+        const result = {
           ...detailedProfile,
           searchKeyword: searchName,
           found: true,
           scrapedAt: new Date().toISOString()
         };
+        
+        console.log(`✅ ALUMNI SEARCH - Profile extraction completed for: ${result.name}`);
+        console.log(`📊 ALUMNI SEARCH - Final result: ${result.position} at ${result.company} | ${result.location}`);
+        
+        return result;
       } else {
         console.log(`No alumni found for: ${searchName}`);
         return {
@@ -734,17 +741,20 @@ class LinkedInService {
    */
   async getDetailedProfileInfo(profileUrl, basicInfo = {}) {
     try {
-      console.log(`Getting detailed profile from: ${profileUrl}`);
+      console.log(`📋 PROFILE DETAILS - Getting detailed profile from: ${profileUrl}`);
 
       const page = this.currentPage;
       
       // Navigate to profile page
+      console.log('🌐 PROFILE DETAILS - Navigating to profile page...');
       await page.goto(profileUrl, { 
         waitUntil: 'domcontentloaded', 
         timeout: 30000 
       });
       
       await this.randomDelay(3000, 5000);
+
+      console.log('⚡ PROFILE DETAILS - Extracting detailed information from profile page...');
 
       // Extract detailed information from profile page
       const profileData = await page.evaluate(() => {
@@ -760,21 +770,62 @@ class LinkedInService {
         };
 
         try {
-          // Extract name
-          const nameElement = document.querySelector('.text-heading-xlarge, .pv-text-details__left-panel h1');
-          data.name = nameElement?.textContent?.trim() || '';
+          console.log('📊 Extracting profile data from page...');
 
-          // Extract headline/position
-          const headlineElement = document.querySelector('.text-body-medium.break-words[data-generated-suggestion-target]');
-          data.bio = headlineElement?.textContent?.trim() || '';
+          // Extract name - try multiple selectors
+          const nameSelectors = [
+            '.text-heading-xlarge',
+            '.pv-text-details__left-panel h1',
+            '.pv-top-card__title',
+            'h1.text-heading-xlarge'
+          ];
+          
+          for (const selector of nameSelectors) {
+            const nameElement = document.querySelector(selector);
+            if (nameElement?.textContent?.trim()) {
+              data.name = nameElement.textContent.trim();
+              break;
+            }
+          }
+          console.log('👤 Name extracted:', data.name);
 
-          // Extract location
-          const locationElement = document.querySelector('.text-body-small.inline.t-black--light.break-words');
-          data.location = locationElement?.textContent?.trim() || '';
+          // Extract headline/bio - try multiple selectors
+          const bioSelectors = [
+            '.text-body-medium.break-words[data-generated-suggestion-target]',
+            '.pv-text-details__left-panel .text-body-medium',
+            '.pv-top-card--list-bullet .pv-entity__caption',
+            '.pv-top-card__headline'
+          ];
+          
+          for (const selector of bioSelectors) {
+            const bioElement = document.querySelector(selector);
+            if (bioElement?.textContent?.trim()) {
+              data.bio = bioElement.textContent.trim();
+              break;
+            }
+          }
+          console.log('💼 Bio/Headline extracted:', data.bio);
+
+          // Extract location - try multiple selectors
+          const locationSelectors = [
+            '.text-body-small.inline.t-black--light.break-words',
+            '.pv-text-details__left-panel .text-body-small',
+            '.pv-top-card--list-bullet .pv-top-card__location'
+          ];
+          
+          for (const selector of locationSelectors) {
+            const locationElement = document.querySelector(selector);
+            if (locationElement?.textContent?.trim()) {
+              data.location = locationElement.textContent.trim();
+              break;
+            }
+          }
+          console.log('📍 Location extracted:', data.location);
 
           // Extract current position from experience section
           const experienceSection = document.querySelector('#experience');
           if (experienceSection) {
+            console.log('🏢 Extracting experience data...');
             const experienceItems = experienceSection.querySelectorAll('.pvs-list__item--line-separated');
             
             experienceItems.forEach((item, index) => {
@@ -805,15 +856,19 @@ class LinkedInService {
                     data.company = company.split(' · ')[0]; // Remove employment type
                   }
                 }
+                console.log(`💼 Experience ${index + 1}: ${position} at ${company}`);
               } catch (expError) {
                 console.log('Error extracting experience item:', expError);
               }
             });
+          } else {
+            console.log('❌ No experience section found');
           }
 
           // Extract education
           const educationSection = document.querySelector('#education');
           if (educationSection) {
+            console.log('🎓 Extracting education data...');
             const educationItems = educationSection.querySelectorAll('.pvs-list__item--line-separated');
             
             educationItems.forEach((item, index) => {
@@ -835,16 +890,20 @@ class LinkedInService {
                     duration: duration
                   });
                 }
+                console.log(`🎓 Education ${index + 1}: ${degree} at ${school}`);
               } catch (eduError) {
                 console.log('Error extracting education item:', eduError);
               }
             });
+          } else {
+            console.log('❌ No education section found');
           }
 
         } catch (error) {
-          console.log('Error extracting profile data:', error);
+          console.log('❌ Error extracting profile data:', error);
         }
 
+        console.log('✅ Profile data extraction completed');
         return data;
       });
 
@@ -871,11 +930,16 @@ class LinkedInService {
         universityName: process.env.UNIVERSITY_NAME || 'Unknown University'
       };
 
-      console.log(`Detailed profile extracted for: ${result.name}`);
+      console.log(`✅ PROFILE DETAILS - Detailed profile extracted for: ${result.name}`);
+      console.log(`📋 Position: ${result.position} at ${result.company}`);
+      console.log(`📍 Location: ${result.location}`);
+      console.log(`💼 Experience entries: ${result.experience.length}`);
+      console.log(`🎓 Education entries: ${result.education.length}`);
+      
       return result;
 
     } catch (error) {
-      console.error('Error getting detailed profile:', error);
+      console.error('❌ PROFILE DETAILS - Error getting detailed profile:', error);
       
       // Return basic info with error indication
       return {
@@ -914,6 +978,90 @@ class LinkedInService {
   async randomDelay(min = 1000, max = 3000) {
     const delay = Math.random() * (max - min) + min;
     await new Promise(resolve => setTimeout(resolve, delay));
+  }
+
+  /**
+   * Navigate to user's own profile after scraping is complete
+   */
+  async navigateToMyProfile() {
+    try {
+      if (!this.isLoggedIn || !this.currentPage) {
+        throw new Error('Not logged in or page not available');
+      }
+
+      console.log('🏠 Navigating to user profile after scraping completion...');
+      const page = this.currentPage;
+      
+      // Navigate to the user's profile (LinkedIn "me" page)
+      await page.goto('https://www.linkedin.com/in/me/', { 
+        waitUntil: 'domcontentloaded', 
+        timeout: 30000 
+      });
+      
+      await this.randomDelay(2000, 4000);
+      
+      // Check if we successfully navigated to profile
+      const currentUrl = page.url();
+      if (currentUrl.includes('/in/') && !currentUrl.includes('/school/')) {
+        console.log('✅ Successfully navigated to user profile');
+        return { 
+          success: true, 
+          message: 'Successfully navigated to your profile',
+          profileUrl: currentUrl
+        };
+      } else {
+        throw new Error('Failed to navigate to profile page');
+      }
+
+    } catch (error) {
+      console.error('Error navigating to user profile:', error);
+      return { 
+        success: false, 
+        message: `Failed to navigate to profile: ${error.message}` 
+      };
+    }
+  }
+
+  /**
+   * Navigate back to LinkedIn feed
+   */
+  async navigateToFeed() {
+    try {
+      if (!this.isLoggedIn || !this.currentPage) {
+        throw new Error('Not logged in or page not available');
+      }
+
+      console.log('🏠 Navigating to LinkedIn feed...');
+      const page = this.currentPage;
+      
+      // Navigate to LinkedIn feed
+      await page.goto('https://www.linkedin.com/feed/', { 
+        waitUntil: 'domcontentloaded', 
+        timeout: 30000 
+      });
+      
+      await this.randomDelay(2000, 4000);
+      
+      // Check if we successfully navigated to feed
+      const currentUrl = page.url();
+      if (currentUrl.includes('/feed')) {
+        console.log('✅ Successfully navigated to LinkedIn feed');
+        return { 
+          success: true, 
+          message: 'Successfully navigated to LinkedIn feed',
+          feedUrl: currentUrl
+        };
+      } else {
+        throw new Error('Failed to navigate to feed page');
+      }
+
+    } catch (error) {
+      console.error('Error navigating to feed:', error);
+      return { 
+        success: false, 
+        message: `Failed to navigate to feed: ${error.message}` 
+      };
+    }
   }
 
   /**

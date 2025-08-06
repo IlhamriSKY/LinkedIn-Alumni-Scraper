@@ -1150,6 +1150,110 @@ app.post('/api/scrape/reset', async (req, res) => {
   }
 });
 
+// Navigate to user profile
+app.post('/api/navigate-profile', async (req, res) => {
+  try {
+    if (!appState.browserOpen) {
+      throw new Error('Browser is not open. Please open browser first.');
+    }
+
+    if (!appState.loggedIn) {
+      throw new Error('Not logged in. Please login first.');
+    }
+
+    logger.info('Navigating to user profile via API');
+    updateState({
+      status: 'navigating-profile',
+      message: 'Navigating to your profile...',
+      error: null
+    });
+
+    const result = await linkedInService.navigateToMyProfile();
+    
+    if (result.success) {
+      updateState({
+        status: 'ready',
+        message: 'Successfully navigated to your profile'
+      });
+
+      res.json({ 
+        success: true, 
+        message: 'Successfully navigated to your profile',
+        profileUrl: result.profileUrl,
+        state: appState
+      });
+    } else {
+      throw new Error(result.message || 'Failed to navigate to profile');
+    }
+
+  } catch (error) {
+    logger.error('Failed to navigate to profile', { error: error.message });
+    updateState({
+      status: 'error',
+      message: `Navigation failed: ${error.message}`,
+      error: error.message
+    });
+
+    res.status(500).json({ 
+      success: false, 
+      message: error.message,
+      state: appState
+    });
+  }
+});
+
+// Navigate to LinkedIn feed
+app.post('/api/navigate-feed', async (req, res) => {
+  try {
+    if (!appState.browserOpen) {
+      throw new Error('Browser is not open. Please open browser first.');
+    }
+
+    if (!appState.loggedIn) {
+      throw new Error('Not logged in. Please login first.');
+    }
+
+    logger.info('Navigating to LinkedIn feed via API');
+    updateState({
+      status: 'navigating-feed',
+      message: 'Navigating to LinkedIn feed...',
+      error: null
+    });
+
+    const result = await linkedInService.navigateToFeed();
+    
+    if (result.success) {
+      updateState({
+        status: 'ready',
+        message: 'Successfully navigated to LinkedIn feed'
+      });
+
+      res.json({ 
+        success: true, 
+        message: 'Successfully navigated to LinkedIn feed',
+        feedUrl: result.feedUrl,
+        state: appState
+      });
+    } else {
+      throw new Error(result.message || 'Failed to navigate to feed');
+    }
+
+  } catch (error) {
+    logger.error('Failed to navigate to feed', { error: error.message });
+    updateState({
+      status: 'error',
+      message: `Navigation failed: ${error.message}`,
+      error: error.message
+    });
+
+    res.status(500).json({ 
+      success: false, 
+      message: error.message,
+      state: appState
+    });
+  }
+});
+
 // Get current CSV data for DataTable
 app.get('/api/csv/current', async (req, res) => {
   try {
@@ -1521,14 +1625,48 @@ async function scrapeProfiles(searchNames, startIndex = 0) {
       // Finalize real-time CSV session
       const finalCsvFile = csvService.finalizeRealTimeSession();
       
-      updateState({
-        scrapingActive: false,
-        status: 'completed',
-        message: `Alumni scraping completed! Found ${appState.foundCount} profiles, ${appState.notFoundCount} not found, ${appState.scrapedCount} total processed. Results saved to: ${finalCsvFile ? path.basename(finalCsvFile) : 'CSV file'}`,
-        progress: 100,
-        progressPercent: 100,
-        finalCsvFile: finalCsvFile
-      });
+      // Navigate to user's profile after completion
+      try {
+        logger.info('Navigating to user profile after scraping completion...');
+        updateState({
+          status: 'navigating-home',
+          message: 'Scraping completed! Navigating to your profile...'
+        });
+        
+        const navigationResult = await linkedInService.navigateToMyProfile();
+        
+        if (navigationResult.success) {
+          logger.info('Successfully navigated to user profile after scraping');
+          updateState({
+            scrapingActive: false,
+            status: 'completed',
+            message: `Alumni scraping completed! Found ${appState.foundCount} profiles, ${appState.notFoundCount} not found, ${appState.scrapedCount} total processed. Results saved to: ${finalCsvFile ? path.basename(finalCsvFile) : 'CSV file'}. You are now on your profile page.`,
+            progress: 100,
+            progressPercent: 100,
+            finalCsvFile: finalCsvFile
+          });
+        } else {
+          logger.warn('Failed to navigate to user profile, but scraping completed successfully');
+          updateState({
+            scrapingActive: false,
+            status: 'completed',
+            message: `Alumni scraping completed! Found ${appState.foundCount} profiles, ${appState.notFoundCount} not found, ${appState.scrapedCount} total processed. Results saved to: ${finalCsvFile ? path.basename(finalCsvFile) : 'CSV file'}.`,
+            progress: 100,
+            progressPercent: 100,
+            finalCsvFile: finalCsvFile
+          });
+        }
+      } catch (navError) {
+        logger.error('Error navigating to user profile after scraping:', navError);
+        updateState({
+          scrapingActive: false,
+          status: 'completed',
+          message: `Alumni scraping completed! Found ${appState.foundCount} profiles, ${appState.notFoundCount} not found, ${appState.scrapedCount} total processed. Results saved to: ${finalCsvFile ? path.basename(finalCsvFile) : 'CSV file'}.`,
+          progress: 100,
+          progressPercent: 100,
+          finalCsvFile: finalCsvFile
+        });
+      }
     }
 
   } catch (error) {

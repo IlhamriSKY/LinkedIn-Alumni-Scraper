@@ -14,7 +14,7 @@ const __dirname = path.dirname(__filename);
 
 class CsvService {
   constructor() {
-    this.resultsDir = path.join(__dirname, '../../../results');
+    this.resultsDir = path.join(__dirname, '../../results');
     this.currentSessionFile = null;
     this.currentWriter = null;
     this.headerWritten = false;
