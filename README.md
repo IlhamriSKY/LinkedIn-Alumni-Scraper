@@ -6,12 +6,7 @@
 
 [![Node.js](https://img.shields.io/badge/Node.js-16%2B-green?style=for-the-badge&logo=node.js)](https://nodejs.org)
 [![React](https://img.shields.io/badge/React-18%2B-blue?style=for-the-badge&logo=react)](https://reactjs.org)
-[![Express](https://img.shields.io/badge/Express-4%2B-black?style=for-the-badge&logo=express)](https://expressjs.com)
-[![Socket.IO](https://img.shields.io/badge/Socket.IO-4%2B-red?style=for-the-badge&logo=socket.io)](https://socket.io)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](./LICENSE)
-[![GitHub Stars](https://img.shields.io/github/stars/IlhamriSKY/LinkedIn-Alumni-Scraper?style=for-the-badge)](https://github.com/IlhamriSKY/LinkedIn-Alumni-Scraper/stargazers)
-[![GitHub Forks](https://img.shields.io/github/forks/IlhamriSKY/LinkedIn-Alumni-Scraper?style=for-the-badge)](https://github.com/IlhamriSKY/LinkedIn-Alumni-Scraper/network)
-[![GitHub Issues](https://img.shields.io/github/issues/IlhamriSKY/LinkedIn-Alumni-Scraper?style=for-the-badge)](https://github.com/IlhamriSKY/LinkedIn-Alumni-Scraper/issues)
 
 *Professional LinkedIn Alumni Data Collection with Real-time Dashboard*
 
@@ -61,29 +56,11 @@ By using this software, you acknowledge and agree that:
 
 ## 📥 Download
 
-### Method 1: Clone with Git
-
 ```bash
 # Clone the repository
 git clone https://github.com/IlhamriSKY/LinkedIn-Alumni-Scraper.git
 
 # Navigate to project directory
-cd LinkedIn-Alumni-Scraper
-```
-
-### Method 2: Download ZIP
-
-1. Go to [GitHub Repository](https://github.com/IlhamriSKY/LinkedIn-Alumni-Scraper)
-2. Click the green **"Code"** button
-3. Select **"Download ZIP"**
-4. Extract the downloaded file
-5. Navigate to the extracted folder
-
-### Method 3: GitHub CLI
-
-```bash
-# Using GitHub CLI
-gh repo clone IlhamriSKY/LinkedIn-Alumni-Scraper
 cd LinkedIn-Alumni-Scraper
 ```
 
@@ -99,46 +76,44 @@ cd LinkedIn-Alumni-Scraper
 
 ### Installation
 
-#### Option 1: Automatic Installation (Recommended)
-
 ```bash
-# Install all dependencies automatically
-npm run install:deps
-```
-
-#### Option 2: Manual Installation
-
-```bash
-# Install root dependencies
-npm install
-
-# Install backend dependencies
-cd backend && npm install
-
-# Install frontend dependencies
-cd ../frontend && npm install
+# Install all dependencies
+node start.js --install
 ```
 
 ### Configuration
 
 1. **Setup LinkedIn Credentials** (Required):
    ```bash
+   # Copy example files and edit them
+   cp backend/.env.example backend/.env
+   
    # Edit backend/.env file
    LINKEDIN_EMAIL=your_email@example.com
    LINKEDIN_PASSWORD=your_password
-   ```
-
-2. **Configure University Information**:
-   ```bash
-   # Edit backend/.env file
    UNIVERSITY_NAME=Your University Name
    UNIVERSITY_LINKEDIN_ID=your-university-linkedin-id
    UNIVERSITY_LINKEDIN_URL=https://www.linkedin.com/school/your-university/people/
    ```
 
-3. **Prepare Search Names**:
+2. **Configure Frontend** (Required):
    ```bash
-   # Create search_names.csv in root directory
+    # Copy example files and edit theme
+    cp frontend/.env.example frontend/.env
+
+   # Edit frontend/.env file
+   VITE_API_BASE_URL=http://localhost:3001
+   VITE_SOCKET_URL=http://localhost:3001
+   VITE_APP_NAME=LinkedIn Alumni Scraper
+   VITE_UNIVERSITY_NAME=Your University
+   ```
+
+3. **Prepare Search Names** (Required):
+   ```bash
+   # Copy example file and edit with your names
+   cp search_names.example.csv search_names.csv
+   
+   # Edit search_names.csv with names to search:
    John Doe
    Jane Smith
    Michael Johnson
@@ -148,55 +123,27 @@ cd ../frontend && npm install
 
 ## 🏃‍♂️ Running the Application
 
-### Development Mode (Recommended for Development)
+### Development Mode
 
 ```bash
 # Start development mode
-npm run dev
+node start.js --dev
 
 # This will start:
 # - Frontend dev server: http://localhost:5173
 # - Backend server: http://localhost:3001
 ```
 
-**Development Features:**
-- ✅ Hot reload for frontend changes
-- ✅ Auto-restart for backend changes
-- ✅ Separate dev servers for optimal development experience
-- ✅ Real-time debugging and logging
-
 ### Production Mode
 
 ```bash
 # Start production mode
-npm start
+node start.js
 
 # This will:
 # 1. Build the frontend for production
 # 2. Start the backend server
 # 3. Serve frontend through backend: http://localhost:3001
-```
-
-**Production Features:**
-- ✅ Optimized frontend build
-- ✅ Single server deployment
-- ✅ Better performance
-- ✅ Production-ready configuration
-
-### Alternative Commands
-
-```bash
-# Backend only
-npm run backend
-
-# Frontend only
-npm run frontend
-
-# Build frontend
-npm run build
-
-# Clean builds
-npm run clean
 ```
 
 ---
@@ -258,90 +205,6 @@ npm run clean
 
 ## 📖 Documentation
 
-### Dashboard Features
-
-#### Status Indicators
-- 🟢 **Backend Connected** - Real-time server connection
-- 🟢 **Browser Open** - Chrome browser status
-- 🟢 **Logged In** - LinkedIn authentication status
-- 🟢 **Scraping Active** - Current operation status
-
-#### Real-time Updates
-- **Progress Tracking** - Live percentage and profile count
-- **Current Activity** - Shows currently processed profile
-- **Results Counter** - Real-time success/failure tracking
-- **Toast Notifications** - Instant feedback for all actions
-
-#### Theme Support
-- **Dark Mode** - Professional dark interface
-- **Light Mode** - Clean light interface
-- **System Theme** - Automatic theme detection
-
-### Configuration Options
-
-#### Environment Variables
-
-**Backend Configuration** (`backend/.env`):
-```env
-# Required LinkedIn Credentials
-LINKEDIN_EMAIL=your_email@example.com
-LINKEDIN_PASSWORD=your_password
-
-# University Information
-UNIVERSITY_NAME=Your University
-UNIVERSITY_LINKEDIN_ID=university-linkedin-id
-UNIVERSITY_LINKEDIN_URL=https://linkedin.com/school/university/people/
-
-# Server Settings
-PORT=3001
-NODE_ENV=development
-HEADLESS=false
-
-# Anti-Detection Settings
-ENABLE_STEALTH=true
-HUMAN_LIKE_DELAYS=true
-RANDOM_MOUSE_MOVEMENTS=true
-```
-
-**Frontend Configuration** (`frontend/.env`):
-```env
-# API Configuration
-VITE_API_BASE_URL=http://localhost:3001
-VITE_SOCKET_URL=http://localhost:3001
-VITE_APP_NAME=LinkedIn Alumni Scraper
-VITE_UNIVERSITY_NAME=Your University
-```
-
-### API Endpoints
-
-The application provides REST API endpoints for external integration:
-
-```bash
-# System Information
-GET /api/health              # Health check
-GET /api/state               # Current application state
-
-# Browser Control
-POST /api/browser/open       # Open browser
-GET /api/browser/status      # Browser status
-
-# Authentication
-POST /api/login              # LinkedIn login
-GET /api/login/check         # Check login status
-
-# Scraping Operations
-POST /api/scrape/start       # Start scraping
-POST /api/scrape/stop        # Stop scraping
-POST /api/scrape/pause       # Pause scraping
-POST /api/scrape/reset       # Reset session
-
-# Data Export
-GET /api/results/export      # Export results
-GET /api/download/results    # Download CSV file
-```
-
----
-
 ## 🔧 Advanced Configuration
 
 ### Performance Tuning
@@ -376,30 +239,6 @@ DISABLE_WEB_SECURITY=false
 BLOCK_IMAGES=false
 BLOCK_CSS=false
 SAVE_SCREENSHOTS=false
-```
-
-### Deployment Options
-
-#### Option 1: Single Server Deployment
-
-```bash
-# Build and start
-npm run build
-npm start
-
-# Access at: http://localhost:3001
-```
-
-#### Option 2: Separate Servers
-
-```bash
-# Terminal 1: Backend
-cd backend && npm start
-
-# Terminal 2: Frontend
-cd frontend && npm run dev
-
-# Access at: http://localhost:5173
 ```
 
 ---
