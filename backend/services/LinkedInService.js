@@ -21,6 +21,60 @@ class LinkedInService {
     const delay = Math.random() * (max - min) + min;
     return new Promise(resolve => setTimeout(resolve, delay));
   }
+
+  /**
+   * Simple delay function
+   * @param {number} ms - Milliseconds to delay
+   * @returns {Promise<void>}
+   */
+  async delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Configurable delay based on .env settings
+   * Uses DELAY_MIN and DELAY_MAX from environment variables
+   */
+  async randomConfigurableDelay() {
+    const delayMin = parseInt(process.env.DELAY_MIN) || 2000;
+    const delayMax = parseInt(process.env.DELAY_MAX) || 5000;
+    const randomDelay = Math.floor(Math.random() * (delayMax - delayMin + 1)) + delayMin;
+    
+    console.log(`[DELAY] Waiting ${randomDelay}ms (min: ${delayMin}ms, max: ${delayMax}ms)`);
+    await this.delay(randomDelay);
+    return randomDelay;
+  }
+
+  /**
+   * Step-specific delay for different operations
+   */
+  async stepDelay(step = 'default') {
+    const delayMin = parseInt(process.env.DELAY_MIN) || 2000;
+    const delayMax = parseInt(process.env.DELAY_MAX) || 5000;
+    
+    const stepDelays = {
+      'search': parseInt(process.env.STEP_DELAY_SEARCH) || Math.floor(Math.random() * (3000 - 1500 + 1)) + 1500,
+      'navigation': parseInt(process.env.STEP_DELAY_NAVIGATION) || Math.floor(Math.random() * (2000 - 1000 + 1)) + 1000,
+      'profile': parseInt(process.env.STEP_DELAY_PROFILE) || Math.floor(Math.random() * (4000 - 2000 + 1)) + 2000,
+      'typing': parseInt(process.env.STEP_DELAY_TYPING) || Math.floor(Math.random() * (800 - 200 + 1)) + 200,
+      'click': parseInt(process.env.STEP_DELAY_CLICK) || Math.floor(Math.random() * (1500 - 500 + 1)) + 500,
+      'default': Math.floor(Math.random() * (delayMax - delayMin + 1)) + delayMin
+    };
+    
+    let delayTime = stepDelays[step] !== undefined ? stepDelays[step] : stepDelays['default'];
+    
+    // Add randomness to configured delays (±20%)
+    if (step !== 'default' && process.env[`STEP_DELAY_${step.toUpperCase()}`]) {
+      const variance = delayTime * 0.2;
+      delayTime = delayTime + (Math.random() * variance * 2 - variance);
+      delayTime = Math.max(500, Math.floor(delayTime)); // Minimum 500ms
+    }
+    
+    console.log(`[STEP DELAY] ${step}: ${delayTime}ms`);
+    await this.delay(delayTime);
+    return delayTime;
+  }
+
   /**
    * Simulate human typing with realistic patterns and delays
    * @param {Page} page - Puppeteer page instance
@@ -431,18 +485,31 @@ class LinkedInService {
       const currentUrl = page.url();
       console.log(`ALUMNI SEARCH - Current URL: ${currentUrl}`);
       console.log(`ALUMNI SEARCH - Searching for: ${searchName} on university alumni page`);
+      
       if (!currentUrl.includes('/school/') || !currentUrl.includes('/people/')) {
         throw new Error(`Not on university alumni page. Current URL: ${currentUrl}`);
       }
+      
       console.log('ALUMNI SEARCH - Confirmed on university alumni page, proceeding with alumni-specific search...');
+      
+      // Step 1: Wait before interacting with search input
+      await this.stepDelay('search');
+      
       const searchInput = await page.waitForSelector('#people-search-keywords', { timeout: 10000 });
       await searchInput.click({ clickCount: 3 });
       await page.keyboard.press('Backspace');
-      await this.randomDelay(500, 1000);
+      
+      // Step 2: Typing delay
+      await this.stepDelay('typing');
       await this.typeWithHumanLikeDelay(page, searchName);
-      await this.randomDelay(1000, 2000);
+      
+      // Step 3: Before pressing enter
+      await this.stepDelay('click');
       await page.keyboard.press('Enter');
-      await this.randomDelay(3000, 5000);
+      
+      // Step 4: Wait for search results to load
+      await this.stepDelay('search');
+      
       try {
         await page.waitForSelector('.org-people-profile-card', { timeout: 15000 });
       } catch (e) {
@@ -462,52 +529,195 @@ class LinkedInService {
         };
       }
       const alumniProfiles = await page.evaluate((searchTerm) => {
+        console.log('Evaluating alumni profiles from DOM...');
         const profileCards = document.querySelectorAll('.org-people-profile-card');
+        console.log(`Found ${profileCards.length} profile cards`);
         const profiles = [];
+        
         profileCards.forEach((card, index) => {
           if (index >= 5) return; // Limit to first 5 results
           try {
-            const nameElement = card.querySelector('.artdeco-entity-lockup__title .lt-line-clamp');
-            const subtitleElement = card.querySelector('.artdeco-entity-lockup__subtitle .lt-line-clamp');
-            const imageElement = card.querySelector('.evi-image');
-            const profileLink = card.querySelector('a[href*="/in/"]');
+            console.log(`Processing card ${index + 1}...`);
+            
+            // Get name from the title link
+            const nameElement = card.querySelector('.artdeco-entity-lockup__title a .lt-line-clamp');
             const name = nameElement?.textContent?.trim() || 'LinkedIn Member';
-            const subtitle = subtitleElement?.textContent?.trim() || '';
+            console.log(`Card ${index + 1} name: ${name}`);
+            
+            // Get profile URL from the title link
+            const profileLink = card.querySelector('.artdeco-entity-lockup__title a[href*="/in/"]');
             const profileUrl = profileLink?.href || '';
+            
+            // Clean the profile URL (remove query parameters)
+            const cleanUrl = profileUrl.split('?')[0];
+            console.log(`Card ${index + 1} profile URL: ${cleanUrl}`);
+            
+            // Get subtitle/position
+            const subtitleElement = card.querySelector('.artdeco-entity-lockup__subtitle .lt-line-clamp');
+            const subtitle = subtitleElement?.textContent?.trim() || '';
+            console.log(`Card ${index + 1} subtitle: ${subtitle}`);
+            
+            // Get image URL
+            const imageElement = card.querySelector('.evi-image');
             const imageUrl = imageElement?.src || '';
-            if (!profileUrl || name === 'LinkedIn Member') {
+            
+            // Get connection degree
+            const degreeElement = card.querySelector('.artdeco-entity-lockup__degree');
+            const connectionDegree = degreeElement?.textContent?.trim() || '';
+            
+            // Skip if no profile URL or if it's just a LinkedIn Member placeholder
+            if (!cleanUrl || name === 'LinkedIn Member' || cleanUrl.includes('miniProfileUrn')) {
+              console.log(`Skipping card ${index + 1}: invalid profile URL or placeholder`);
               return;
             }
+            
+            console.log(`Adding valid profile: ${name} with URL: ${cleanUrl}`);
             profiles.push({
               name: name,
               subtitle: subtitle,
-              profileUrl: profileUrl,
+              profileUrl: cleanUrl,
               imageUrl: imageUrl,
+              connectionDegree: connectionDegree,
               searchKeyword: searchTerm,
               found: true,
               cardIndex: index
             });
           } catch (error) {
-            console.log('Error extracting profile from card:', error);
+            console.log(`Error extracting profile from card ${index}:`, error);
           }
         });
+        
+        console.log(`Successfully extracted ${profiles.length} valid profiles`);
         return profiles;
       }, searchName);
       if (alumniProfiles.length > 0) {
-        const bestMatch = alumniProfiles[0];
-        console.log(`ALUMNI SEARCH - Found alumni profile: ${bestMatch.name}`);
-        console.log(`ALUMNI SEARCH - Profile URL: ${bestMatch.profileUrl}`);
-        console.log(`ALUMNI SEARCH - Getting detailed profile information...`);
-        const detailedProfile = await this.getDetailedProfileInfo(bestMatch.profileUrl, bestMatch);
-        const result = {
-          ...detailedProfile,
-          searchKeyword: searchName,
-          found: true,
-          scrapedAt: new Date().toISOString()
-        };
-        console.log(`ALUMNI SEARCH - Profile extraction completed for: ${result.name}`);
-        console.log(`ALUMNI SEARCH - Final result: ${result.position} at ${result.company} | ${result.location}`);
-        return result;
+        console.log(`ALUMNI SEARCH - Found ${alumniProfiles.length} alumni profiles`);
+        
+        // Emit found profiles first
+        this.socketIo.emit('linkedinUpdate', {
+          type: 'search_progress',
+          data: {
+            searchName: searchName,
+            foundCount: alumniProfiles.length,
+            status: `Found ${alumniProfiles.length} profiles, extracting details...`,
+            profiles: alumniProfiles
+          }
+        });
+
+        // Process each profile to get detailed information
+        const detailedProfiles = [];
+        for (let i = 0; i < alumniProfiles.length; i++) {
+          const profile = alumniProfiles[i];
+          console.log(`\n=== Processing profile ${i + 1}/${alumniProfiles.length}: ${profile.name} ===`);
+          
+          // Emit processing status
+          this.socketIo.emit('linkedinUpdate', {
+            type: 'profile_processing',
+            data: {
+              currentProfile: i + 1,
+              totalProfiles: alumniProfiles.length,
+              profileName: profile.name,
+              status: `Extracting details for ${profile.name}...`
+            }
+          });
+
+          // Step delay before processing each profile
+          await this.stepDelay('profile');
+
+          try {
+            console.log(`ALUMNI SEARCH - Getting detailed info for: ${profile.name}`);
+            console.log(`ALUMNI SEARCH - Profile URL: ${profile.profileUrl}`);
+            
+            // Get detailed profile information
+            const detailedProfile = await this.getDetailedProfileInfo(profile.profileUrl, profile);
+            
+            if (detailedProfile) {
+              const result = {
+                ...detailedProfile,
+                searchKeyword: searchName,
+                found: true,
+                scrapedAt: new Date().toISOString(),
+                profileIndex: i + 1
+              };
+              
+              detailedProfiles.push(result);
+              console.log(`ALUMNI SEARCH - Profile extraction completed for: ${result.name}`);
+              console.log(`ALUMNI SEARCH - Details: ${result.position} at ${result.company} | ${result.location}`);
+              
+              // Emit individual profile completion
+              this.socketIo.emit('linkedinUpdate', {
+                type: 'profile_complete',
+                data: {
+                  profile: result,
+                  profileIndex: i + 1,
+                  totalProfiles: alumniProfiles.length
+                }
+              });
+            } else {
+              // Add profile with basic info if detailed extraction failed
+              const basicResult = {
+                ...profile,
+                position: 'Details not available',
+                company: 'N/A',
+                bio: '',
+                experience: [],
+                education: [],
+                searchKeyword: searchName,
+                found: true,
+                detailsExtracted: false,
+                scrapedAt: new Date().toISOString(),
+                profileIndex: i + 1
+              };
+              
+              detailedProfiles.push(basicResult);
+              console.log(`ALUMNI SEARCH - Basic info only for: ${profile.name}`);
+            }
+            
+            // Add delay between profiles to avoid rate limiting
+            if (i < alumniProfiles.length - 1) {
+              console.log('Waiting before processing next profile...');
+              await this.delay(3000);
+            }
+            
+          } catch (error) {
+            console.error(`Error processing profile ${profile.name}:`, error.message);
+            
+            // Add profile with error status
+            const errorResult = {
+              ...profile,
+              position: 'Error extracting details',
+              company: 'Error',
+              location: 'Error',
+              bio: '',
+              experience: [],
+              education: [],
+              searchKeyword: searchName,
+              found: true,
+              error: error.message,
+              detailsExtracted: false,
+              scrapedAt: new Date().toISOString(),
+              profileIndex: i + 1
+            };
+            
+            detailedProfiles.push(errorResult);
+            
+            this.socketIo.emit('linkedinUpdate', {
+              type: 'profile_error',
+              data: {
+                profile: errorResult,
+                profileIndex: i + 1,
+                totalProfiles: alumniProfiles.length,
+                error: error.message
+              }
+            });
+          }
+        }
+
+        console.log(`\n=== ALUMNI SEARCH COMPLETED ===`);
+        console.log(`Successfully processed ${detailedProfiles.length} profiles for: ${searchName}`);
+        
+        // Return all detailed profiles
+        return detailedProfiles;
       } else {
         console.log(`No alumni found for: ${searchName}`);
         return {
@@ -555,18 +765,50 @@ class LinkedInService {
       if (!this.isLoggedIn || !this.currentPage) {
         throw new Error('Not logged in or page not available');
       }
-      console.log(`Searching for: ${searchName}`);
-      const profileData = await this.searchAlumniOnUniversityPage(searchName);
-      if (profileData && profileData.found) {
-        console.log(`Found alumni profile: ${profileData.name} - ${profileData.position} at ${profileData.company}`);
-        return profileData;
+      console.log(`Starting search and extraction for: ${searchName}`);
+      
+      const profileResults = await this.searchAlumniOnUniversityPage(searchName);
+      
+      // Check if we got results (could be array or single object)
+      if (Array.isArray(profileResults)) {
+        if (profileResults.length > 0) {
+          console.log(`Found ${profileResults.length} alumni profiles for: ${searchName}`);
+          profileResults.forEach((profile, index) => {
+            console.log(`Profile ${index + 1}: ${profile.name} - ${profile.position} at ${profile.company}`);
+          });
+          return profileResults;
+        } else {
+          console.log(`No alumni profiles found for: ${searchName}`);
+          return [{
+            name: searchName,
+            position: 'Not found',
+            company: 'N/A',
+            location: 'N/A',
+            bio: '',
+            experience: [],
+            education: [],
+            experienceText: '',
+            educationText: '',
+            profileUrl: '',
+            searchKeyword: searchName,
+            found: false,
+            universityName: process.env.UNIVERSITY_NAME || 'Universitas Indonesia',
+            scrapedAt: new Date().toISOString()
+          }];
+        }
       } else {
-        console.log(`No alumni profile found for: ${searchName}`);
-        return profileData; // Return the "not found" result
+        // Handle backward compatibility for single object response
+        if (profileResults && profileResults.found) {
+          console.log(`Found alumni profile: ${profileResults.name} - ${profileResults.position} at ${profileResults.company}`);
+          return [profileResults]; // Wrap in array for consistency
+        } else {
+          console.log(`No alumni profile found for: ${searchName}`);
+          return [profileResults]; // Return the "not found" result wrapped in array
+        }
       }
     } catch (error) {
       console.error(`Error searching for ${searchName}:`, error);
-      return {
+      return [{
         name: searchName,
         position: 'Error',
         company: 'Error',
@@ -582,7 +824,7 @@ class LinkedInService {
         found: false,
         universityName: process.env.UNIVERSITY_NAME || 'Universitas Indonesia',
         scrapedAt: new Date().toISOString()
-      };
+      }];
     }
   }
   /**
@@ -592,14 +834,50 @@ class LinkedInService {
     try {
       console.log(`PROFILE DETAILS - Getting detailed profile from: ${profileUrl}`);
       const page = this.currentPage;
+      
+      // Step 1: Navigation delay
+      await this.stepDelay('navigation');
+      
       console.log('PROFILE DETAILS - Navigating to profile page...');
-      await page.goto(profileUrl, { 
-        waitUntil: 'domcontentloaded', 
-        timeout: 30000 
+      // Ensure clean URL (remove any query parameters that might interfere)
+      const cleanUrl = profileUrl.split('?')[0];
+      console.log(`PROFILE DETAILS - Clean URL: ${cleanUrl}`);
+      
+      // Navigate to profile with extended timeout and wait for network to be idle
+      console.log('PROFILE DETAILS - Starting navigation...');
+      await page.goto(cleanUrl, { 
+        waitUntil: ['networkidle0', 'domcontentloaded'], 
+        timeout: 60000 
       });
-      await this.randomDelay(3000, 5000);
+      
+      console.log('PROFILE DETAILS - Page loaded, checking URL...');
+      const currentUrl = page.url();
+      console.log(`PROFILE DETAILS - Current URL after navigation: ${currentUrl}`);
+      
+      // Verify we're actually on a profile page
+      if (!currentUrl.includes('/in/') || currentUrl.includes('linkedin.com/school/')) {
+        throw new Error(`Navigation failed - not on profile page. Current URL: ${currentUrl}`);
+      }
+      
+      // Step 2: Profile loading delay
+      await this.stepDelay('profile');
+      
+      // Wait for main profile elements to be present
+      console.log('PROFILE DETAILS - Waiting for profile elements...');
+      try {
+        await page.waitForSelector('.pv-text-details__left-panel, .text-heading-xlarge, .pv-top-card, h1', { timeout: 15000 });
+        console.log('PROFILE DETAILS - Profile elements detected');
+      } catch (waitError) {
+        console.log('PROFILE DETAILS - Profile elements not found, proceeding anyway...');
+        console.log('PROFILE DETAILS - Wait error:', waitError.message);
+      }
+      
+      // Step 3: Content extraction delay
+      await this.stepDelay('default');
+      
       console.log('PROFILE DETAILS - Extracting detailed information from profile page...');
       const profileData = await page.evaluate(() => {
+        console.log('Starting profile data extraction...');
         const data = {
           name: '',
           position: '',
@@ -610,118 +888,217 @@ class LinkedInService {
           education: [],
           profileUrl: window.location.href
         };
+        
         try {
-          console.log('Extracting profile data from page...');
+          // Extract name with multiple fallback selectors
+          console.log('Extracting name...');
           const nameSelectors = [
+            'h1.text-heading-xlarge.inline.t-24.v-align-middle.break-words',
             '.text-heading-xlarge',
             '.pv-text-details__left-panel h1',
             '.pv-top-card__title',
-            'h1.text-heading-xlarge'
+            'h1[data-generated-suggestion-target]',
+            '.pv-top-card--list li:first-child',
+            'h1.break-words',
+            'h1'
           ];
+          
           for (const selector of nameSelectors) {
             const nameElement = document.querySelector(selector);
             if (nameElement?.textContent?.trim()) {
               data.name = nameElement.textContent.trim();
+              console.log(`Name found with selector "${selector}": ${data.name}`);
               break;
             }
           }
-          console.log('Name extracted:', data.name);
+          
+          // Extract bio/headline  
+          console.log('Extracting bio/headline...');
           const bioSelectors = [
             '.text-body-medium.break-words[data-generated-suggestion-target]',
             '.pv-text-details__left-panel .text-body-medium',
+            '.pv-top-card__headline .break-words',
             '.pv-top-card--list-bullet .pv-entity__caption',
-            '.pv-top-card__headline'
+            '.pv-top-card__headline',
+            '.text-body-medium.break-words',
+            '.text-body-medium'
           ];
+          
           for (const selector of bioSelectors) {
             const bioElement = document.querySelector(selector);
             if (bioElement?.textContent?.trim()) {
               data.bio = bioElement.textContent.trim();
+              console.log(`Bio found with selector "${selector}": ${data.bio}`);
               break;
             }
           }
-          console.log('Bio/Headline extracted:', data.bio);
+          
+          // Extract location
+          console.log('Extracting location...');
           const locationSelectors = [
             '.text-body-small.inline.t-black--light.break-words',
             '.pv-text-details__left-panel .text-body-small',
-            '.pv-top-card--list-bullet .pv-top-card__location'
+            '.pv-top-card--list .pv-top-card__location',
+            '.text-body-small.break-words',
+            '.text-body-small'
           ];
+          
           for (const selector of locationSelectors) {
             const locationElement = document.querySelector(selector);
             if (locationElement?.textContent?.trim()) {
               data.location = locationElement.textContent.trim();
+              console.log(`Location found with selector "${selector}": ${data.location}`);
               break;
             }
           }
-          console.log('Location extracted:', data.location);
-          const experienceSection = document.querySelector('#experience');
+          
+          // Extract experience with improved selectors
+          console.log('Looking for experience section...');
+          const experienceSection = document.querySelector('#experience, section[data-section="experience"], .experience-section');
           if (experienceSection) {
-            console.log('Extracting experience data...');
-            const experienceItems = experienceSection.querySelectorAll('.pvs-list__item--line-separated');
+            console.log('Experience section found, extracting data...');
+            const experienceItems = experienceSection.parentElement.querySelectorAll('.pvs-list__item--line-separated, .pvs-entity');
+            console.log(`Found ${experienceItems.length} experience items`);
+            
             experienceItems.forEach((item, index) => {
-              if (index >= 5) return; 
+              if (index >= 5) return; // Limit to first 5 experiences
+              
               try {
-                const positionElement = item.querySelector('.mr1.hoverable-link-text.t-bold span[aria-hidden="true"]');
-                const companyElement = item.querySelector('.t-14.t-normal span[aria-hidden="true"]');
-                const durationElement = item.querySelector('.t-14.t-normal.t-black--light .pvs-entity__caption-wrapper span[aria-hidden="true"]');
-                const locationElement = item.querySelector('.t-14.t-normal.t-black--light span[aria-hidden="true"]:last-child');
-                const position = positionElement?.textContent?.trim() || '';
-                const company = companyElement?.textContent?.trim() || '';
+                // Try multiple selectors for position
+                const positionSelectors = [
+                  '.mr1.hoverable-link-text.t-bold span[aria-hidden="true"]',
+                  '.mr1 .hoverable-link-text span[aria-hidden="true"]',
+                  '.pvs-entity__summary-title span[aria-hidden="true"]',
+                  '.t-bold span[aria-hidden="true"]'
+                ];
+                
+                let position = '';
+                for (const selector of positionSelectors) {
+                  const element = item.querySelector(selector);
+                  if (element?.textContent?.trim()) {
+                    position = element.textContent.trim();
+                    break;
+                  }
+                }
+                
+                // Try multiple selectors for company
+                const companySelectors = [
+                  '.t-14.t-normal span[aria-hidden="true"]',
+                  '.pvs-entity__subtitle span[aria-hidden="true"]',
+                  '.pv-entity__secondary-title'
+                ];
+                
+                let company = '';
+                for (const selector of companySelectors) {
+                  const element = item.querySelector(selector);
+                  if (element?.textContent?.trim()) {
+                    company = element.textContent.trim();
+                    break;
+                  }
+                }
+                
+                // Extract duration
+                const durationElement = item.querySelector('.t-14.t-normal.t-black--light .pvs-entity__caption-wrapper span[aria-hidden="true"], .pvs-entity__dates span[aria-hidden="true"]');
                 const duration = durationElement?.textContent?.trim() || '';
-                const location = locationElement?.textContent?.trim() || '';
+                
                 if (position) {
                   data.experience.push({
                     position: position,
                     company: company,
                     duration: duration,
-                    location: location
+                    location: ''
                   });
+                  
+                  // Set current position from first experience
                   if (index === 0) {
                     data.position = position;
                     data.company = company.split(' · ')[0]; // Remove employment type
                   }
+                  
+                  console.log(`Experience ${index + 1}: ${position} at ${company} (${duration})`);
                 }
-                console.log(`Experience ${index + 1}: ${position} at ${company}`);
               } catch (expError) {
-                console.log('Error extracting experience item:', expError);
+                console.log(`Error extracting experience item ${index}:`, expError);
               }
             });
           } else {
-            console.log('No experience section found');
+            console.log('Experience section (#experience) not found');
           }
+          
+          // Extract education with improved selectors
+          console.log('Looking for education section...');
           const educationSection = document.querySelector('#education');
           if (educationSection) {
-            console.log('Extracting education data...');
-            const educationItems = educationSection.querySelectorAll('.pvs-list__item--line-separated');
+            console.log('Education section found, extracting data...');
+            const educationItems = educationSection.parentElement.querySelectorAll('.pvs-list__item--line-separated, .pvs-entity');
+            console.log(`Found ${educationItems.length} education items`);
+            
             educationItems.forEach((item, index) => {
               if (index >= 3) return; // Limit to first 3 education entries
+              
               try {
-                const schoolElement = item.querySelector('.mr1.hoverable-link-text.t-bold span[aria-hidden="true"]');
-                const degreeElement = item.querySelector('.t-14.t-normal span[aria-hidden="true"]');
-                const durationElement = item.querySelector('.t-14.t-normal.t-black--light .pvs-entity__caption-wrapper span[aria-hidden="true"]');
-                const school = schoolElement?.textContent?.trim() || '';
-                const degree = degreeElement?.textContent?.trim() || '';
+                // Extract school name
+                const schoolSelectors = [
+                  '.mr1.hoverable-link-text.t-bold span[aria-hidden="true"]',
+                  '.pvs-entity__summary-title span[aria-hidden="true"]',
+                  '.t-bold span[aria-hidden="true"]'
+                ];
+                
+                let school = '';
+                for (const selector of schoolSelectors) {
+                  const element = item.querySelector(selector);
+                  if (element?.textContent?.trim()) {
+                    school = element.textContent.trim();
+                    break;
+                  }
+                }
+                
+                // Extract degree
+                const degreeSelectors = [
+                  '.t-14.t-normal span[aria-hidden="true"]',
+                  '.pvs-entity__subtitle span[aria-hidden="true"]'
+                ];
+                
+                let degree = '';
+                for (const selector of degreeSelectors) {
+                  const element = item.querySelector(selector);
+                  if (element?.textContent?.trim()) {
+                    degree = element.textContent.trim();
+                    break;
+                  }
+                }
+                
+                // Extract duration
+                const durationElement = item.querySelector('.t-14.t-normal.t-black--light .pvs-entity__caption-wrapper span[aria-hidden="true"], .pvs-entity__dates span[aria-hidden="true"]');
                 const duration = durationElement?.textContent?.trim() || '';
+                
                 if (school) {
                   data.education.push({
                     school: school,
                     degree: degree,
                     duration: duration
                   });
+                  
+                  console.log(`Education ${index + 1}: ${degree} at ${school} (${duration})`);
                 }
-                console.log(`Education ${index + 1}: ${degree} at ${school}`);
               } catch (eduError) {
-                console.log('Error extracting education item:', eduError);
+                console.log(`Error extracting education item ${index}:`, eduError);
               }
             });
           } else {
-            console.log('No education section found');
+            console.log('Education section (#education) not found');
           }
+          
         } catch (error) {
-          console.log('Error extracting profile data:', error);
+          console.log('Error during profile data extraction:', error);
         }
+        
         console.log('Profile data extraction completed');
+        console.log('Final data:', JSON.stringify(data, null, 2));
         return data;
       });
+      
+      // Merge extracted data with basic info
       const result = {
         name: profileData.name || basicInfo.name || '',
         position: profileData.position || basicInfo.subtitle || '',
@@ -739,12 +1116,16 @@ class LinkedInService {
         ).join('; '),
         universityName: process.env.UNIVERSITY_NAME || 'Universitas Indonesia'
       };
+      
       console.log(`PROFILE DETAILS - Detailed profile extracted for: ${result.name}`);
       console.log(`Position: ${result.position} at ${result.company}`);
       console.log(`Location: ${result.location}`);
+      console.log(`Bio: ${result.bio.substring(0, 100)}...`);
       console.log(`Experience entries: ${result.experience.length}`);
       console.log(`Education entries: ${result.education.length}`);
+      
       return result;
+      
     } catch (error) {
       console.error('PROFILE DETAILS - Error getting detailed profile:', error);
       return {

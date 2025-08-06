@@ -18,7 +18,7 @@ const badgeVariants = cva(
         outline:
           "text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
         pulse:
-          "border-transparent bg-green-500 text-white animate-pulse [a&]:hover:bg-green-400 relative before:absolute before:inset-0 before:rounded-md before:bg-green-400 before:animate-ping before:opacity-75",
+          "border-transparent bg-green-500 text-white [a&]:hover:bg-green-400 relative before:absolute before:inset-0 before:rounded-md before:border-2 before:border-green-400/30 before:border-t-green-400 before:animate-spin before:opacity-75",
       },
     },
     defaultVariants: {

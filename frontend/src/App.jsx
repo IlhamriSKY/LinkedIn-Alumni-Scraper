@@ -9,7 +9,7 @@ import { ThemeToggle } from '@/components/theme-toggle'
 import { StatusIndicator } from '@/components/ui/status-indicator'
 import { LoginSteps } from '@/components/ui/login-steps'
 import { AlumniDataTable } from '@/components/ui/alumni-data-table'
-import { LoadingButton, LoadingInline, LoadingDots } from '@/components/ui/loading-spinner'
+import { LoadingButton, LoadingInline } from '@/components/ui/loading-spinner'
 import { toast } from '@/hooks/use-toast'
 import { Toaster } from '@/components/ui/toaster'
 import { 
@@ -23,11 +23,9 @@ import {
   Download,
   LogIn,
   Chrome,
-  GraduationCap,
   UserCheck,
   UserX,
   Home,
-  User,
   Eye
 } from 'lucide-react'
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
@@ -91,6 +89,18 @@ class App extends React.Component {
       currentCsvFile: null, // Track current real-time CSV file
       currentCsvFileName: null, // Track CSV file name for DataTable
       csvFileStats: null, // CSV file statistics
+      loginToastShown: false, // Flag to prevent duplicate login success toast
+      scrapingProgress: {
+        currentSearch: '',
+        foundCount: 0,
+        currentProfile: 0,
+        totalProfiles: 0,
+        currentProfileName: '',
+        completedProfiles: 0,
+        errorCount: 0,
+        status: '',
+        searchResults: []
+      },
       loginSteps: [
         { title: 'Checking Status', description: 'Verifying current authentication' },
         { title: 'Navigate Login', description: 'Opening LinkedIn login page' },
@@ -258,6 +268,7 @@ class App extends React.Component {
         ...prevState,
         browserStatus: data.browserOpen ? 'Open' : 'Closed',
         loginStatus: data.loggedIn ? 'Logged In' : 'Not Logged In',
+        loginToastShown: data.loggedIn ? this.state.loginToastShown : false, // Reset flag on logout
         scrapingStatus: data.scrapingActive ? 'Running' : 'Idle',
         progress: data.progress || 0,
         scrapedCount: data.scrapedCount || 0,
@@ -313,10 +324,19 @@ class App extends React.Component {
         currentLoginStep: -1,
         loginError: !data.success
       });
-      if (data.success) {
+      
+      // Only show toast for manual login attempts, not automatic checks
+      if (data.success && !this.state.loginToastShown && !data.automaticCheck) {
+        this.setState({ loginToastShown: true });
         this.showToast('success', 'Login Successful', 'Successfully logged into LinkedIn');
-      } else if (!data.alreadyLoggedIn && data.showError !== false) {
+      } else if (!data.success && !data.alreadyLoggedIn && data.showError !== false && !data.automaticCheck) {
+        this.setState({ loginToastShown: false }); // Reset flag on login failure
         this.showToast('destructive', 'Login Failed', data.error || 'Failed to login to LinkedIn');
+      }
+      
+      // Reset toast flag on logout
+      if (!data.success) {
+        this.setState({ loginToastShown: false });
       }
     }, this.componentId);
     socketService.on('loginStep', (data) => {
@@ -354,17 +374,32 @@ class App extends React.Component {
         currentPage: data.currentPage || data.url || '',
         currentTab: this.getPageInfo(data)
       });
-      if (data.status === 'open') {
+      
+      // Only show toast for actual status changes, not updates
+      if (data.status === 'open' && this.state.browserStatus !== 'Open') {
         this.showToast('success', 'Browser Opened', 'Chrome browser is now ready');
-      } else if (data.status === 'closed') {
+      } else if (data.status === 'closed' && this.state.browserStatus !== 'Closed') {
         this.showToast('info', 'Browser Closed', 'Chrome browser has been closed');
       }
     }, this.componentId);
     socketService.on('scrapingResult', (data) => {
       console.log('Scraping result:', data);
-      this.setState(prevState => ({
-        scrapingResults: [...prevState.scrapingResults, data]
-      }));
+      
+      // Handle both array and single object responses for backward compatibility
+      if (Array.isArray(data)) {
+        // New format: array of profiles
+        data.forEach(profile => {
+          this.setState(prevState => ({
+            scrapingResults: [...prevState.scrapingResults, profile]
+          }));
+        });
+      } else {
+        // Legacy format: single profile object
+        this.setState(prevState => ({
+          scrapingResults: [...prevState.scrapingResults, data]
+        }));
+      }
+      
       this.loadCsvData();
     }, this.componentId);
     socketService.on('tabUpdate', (data) => {
@@ -378,6 +413,66 @@ class App extends React.Component {
       }));
       if (!data.realTimeUpdate) {
         console.log(`Tab update processed`);
+      }
+    }, this.componentId);
+
+    // Handle LinkedIn scraping updates (new)
+    socketService.on('linkedinUpdate', (data) => {
+      console.log('LinkedIn update received:', data);
+      
+      switch (data.type) {
+        case 'search_progress':
+          console.log(`Found ${data.data.foundCount} profiles for: ${data.data.searchName}`);
+          this.setState(prevState => ({
+            scrapingProgress: {
+              ...prevState.scrapingProgress,
+              currentSearch: data.data.searchName,
+              foundCount: data.data.foundCount,
+              status: data.data.status,
+              searchResults: data.data.profiles || []
+            }
+          }));
+          break;
+          
+        case 'profile_processing':
+          console.log(`Processing profile ${data.data.currentProfile}/${data.data.totalProfiles}: ${data.data.profileName}`);
+          this.setState(prevState => ({
+            scrapingProgress: {
+              ...prevState.scrapingProgress,
+              currentProfile: data.data.currentProfile,
+              totalProfiles: data.data.totalProfiles,
+              currentProfileName: data.data.profileName,
+              status: data.data.status
+            }
+          }));
+          break;
+          
+        case 'profile_complete':
+          console.log(`Completed profile: ${data.data.profile.name}`);
+          this.setState(prevState => ({
+            scrapingResults: [...prevState.scrapingResults, data.data.profile],
+            scrapingProgress: {
+              ...prevState.scrapingProgress,
+              completedProfiles: (prevState.scrapingProgress.completedProfiles || 0) + 1
+            }
+          }));
+          // Update CSV data
+          this.loadCsvData();
+          break;
+          
+        case 'profile_error':
+          console.log(`Error processing profile: ${data.data.profile.name} - ${data.data.error}`);
+          this.setState(prevState => ({
+            scrapingResults: [...prevState.scrapingResults, data.data.profile],
+            scrapingProgress: {
+              ...prevState.scrapingProgress,
+              errorCount: (prevState.scrapingProgress.errorCount || 0) + 1
+            }
+          }));
+          break;
+          
+        default:
+          console.log('Unknown LinkedIn update type:', data.type);
       }
     }, this.componentId);
   }
@@ -472,7 +567,7 @@ class App extends React.Component {
       const result = await response.json();
       if (result.success) {
         this.setState({ browserStatus: 'Open' });
-        this.showToast('success', 'Browser Opened', 'Chrome browser is now ready');
+        // Toast will be shown by browserUpdate socket event
       } else {
         console.error('Failed to open browser:', result.message);
         this.showToast('destructive', 'Browser Error', 'Failed to open Chrome browser');
@@ -529,9 +624,10 @@ class App extends React.Component {
       if (result.success) {
         this.setState({ 
           loginStatus: 'Logged In',
-          currentLoginStep: 3
+          currentLoginStep: 3,
+          loginToastShown: true
         });
-        this.showToast('success', 'Login Successful', 'Successfully logged into LinkedIn');
+        // Toast will be shown by loginUpdate socket event
         setTimeout(() => {
           this.setState({ 
             showLoginSteps: false,
@@ -542,7 +638,8 @@ class App extends React.Component {
         console.error('Login failed:', result.message);
         this.setState({ 
           loginStatus: 'Not Logged In',
-          loginError: true
+          loginError: true,
+          loginToastShown: false // Reset flag on login failure
         });
         this.showToast('destructive', 'Login Failed', result.message || 'Failed to login to LinkedIn');
       }
@@ -550,36 +647,12 @@ class App extends React.Component {
       console.error('Error during login process:', error);
       this.setState({ 
         loginStatus: 'Not Logged In',
-        loginError: true
+        loginError: true,
+        loginToastShown: false // Reset flag on login error
       });
       this.showToast('destructive', 'Login Error', 'Failed to login to LinkedIn');
     } finally {
       this.setState({ isLoggingIn: false });
-    }
-  }
-  handleNavigateToProfile = async () => {
-    console.log('Navigating to user profile...');
-    this.setState({ isNavigating: true });
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/navigate-profile`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      const result = await response.json();
-      console.log('Profile navigation result:', result);
-      if (result.success) {
-        this.showToast('success', 'Navigation Successful', 'Navigated to your profile page');
-      } else {
-        console.error('Navigation failed:', result.message);
-        this.showToast('destructive', 'Navigation Error', result.message || 'Failed to navigate to profile page');
-      }
-    } catch (error) {
-      console.error('Error navigating to profile:', error);
-      this.showToast('destructive', 'Navigation Error', 'Failed to navigate to profile page');
-    } finally {
-      this.setState({ isNavigating: false });
     }
   }
   handleNavigateToFeed = async () => {
@@ -603,31 +676,6 @@ class App extends React.Component {
     } catch (error) {
       console.error('Error navigating to feed:', error);
       this.showToast('destructive', 'Navigation Error', 'Failed to navigate to feed');
-    } finally {
-      this.setState({ isNavigating: false });
-    }
-  }
-  handleNavigateUniversity = async () => {
-    console.log('Navigating to university...');
-    this.setState({ isNavigating: true });
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/navigate-university`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      const result = await response.json();
-      console.log('University navigation result:', result);
-      if (result.success) {
-        this.showToast('info', 'Navigation Successful', 'Navigated to university alumni page');
-      } else {
-        console.error('Navigation failed:', result.message);
-        this.showToast('destructive', 'Navigation Error', result.message || 'Failed to navigate to university page');
-      }
-    } catch (error) {
-      console.error('Error navigating to university:', error);
-      this.showToast('destructive', 'Navigation Error', 'Failed to navigate to university page');
     } finally {
       this.setState({ isNavigating: false });
     }
@@ -881,7 +929,6 @@ class App extends React.Component {
                         </Badge>
                       </div>
                       <div className="flex items-center justify-between col-span-2">
-                        <span>Current Page</span>
                         <div className="text-right">
                           {this.state.isNavigating ? (
                             <div className="flex items-center text-xs">
@@ -890,28 +937,25 @@ class App extends React.Component {
                             </div>
                           ) : (
                             <div className="text-xs">
-                              <Badge variant={this.state.currentTab.isLinkedIn ? 'default' : 'secondary'} className="text-xs">
-                                {this.state.currentTab.type}
-                              </Badge>
-                              {/* Real-time monitoring indicator */}
-                              <div className="inline-flex items-center ml-2">
-                                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                                <span className="text-xs text-green-600 ml-1">Live</span>
-                              </div>
+                              {/* Tab type badge removed */}
                             </div>
                           )}
                         </div>
                       </div>
                     </div>
-                    {/* Simplified Current Page Information with Real-time indicator */}
+                    {/* Current Page Information with Live indicator */}
                     {this.state.currentPage && (
                       <div className="text-xs text-muted-foreground p-2 bg-muted/50 rounded border">
-                        <div className="font-mono break-all">
-                          {this.state.currentPage}
-                        </div>
-                        <div className="flex items-center mt-1 text-green-600">
-                          <div className="w-1 h-1 bg-green-500 rounded-full animate-ping mr-1"></div>
-                          <span className="text-xs">Real-time monitoring active</span>
+                        <div className="font-mono break-all flex items-center justify-between">
+                          <span>{this.state.currentPage}</span>
+                          {/* Live indicator di pojok kanan */}
+                          <div className="flex items-center ml-2">
+                            <div className="relative">
+                              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                              <div className="absolute inset-0 w-2 h-2 bg-green-400 rounded-full animate-ping opacity-75"></div>
+                            </div>
+                            <span className="text-xs text-green-600 ml-1">Live</span>
+                          </div>
                         </div>
                       </div>
                     )}
@@ -949,78 +993,6 @@ class App extends React.Component {
                           )}
                         </Button>
                       )}
-                      {/* Navigate University Button - Show only when on LinkedIn Feed specifically */}
-                      {this.state.browserStatus === 'Open' && 
-                       this.state.currentTab.type === 'LinkedIn Feed' && 
-                       this.state.currentTab.url.includes('/feed') && (
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={this.handleNavigateUniversity}
-                          disabled={this.state.isNavigating}
-                          className="bg-purple-600 hover:bg-purple-700 text-white border-0"
-                        >
-                          {this.state.isNavigating ? (
-                            <>
-                              <LoadingInline size="xs" variant="white" className="mr-2" />
-                              Navigating...
-                            </>
-                          ) : (
-                            <>
-                              <GraduationCap className="h-4 w-4 mr-1" />
-                              Navigate to University
-                            </>
-                          )}
-                        </Button>
-                      )}
-                      {/* Navigate to My Profile Button - Show when logged in and not on profile */}
-                      {this.state.browserStatus === 'Open' && 
-                       this.state.loginStatus === 'Logged In' && 
-                       !this.state.currentTab.url.includes('/in/me') && (
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={this.handleNavigateToProfile}
-                          disabled={this.state.isNavigating}
-                          className="bg-blue-600 hover:bg-blue-700 text-white border-0"
-                        >
-                          {this.state.isNavigating ? (
-                            <>
-                              <LoadingInline size="xs" variant="white" className="mr-2" />
-                              Navigating...
-                            </>
-                          ) : (
-                            <>
-                              <User className="h-4 w-4 mr-1" />
-                              My Profile
-                            </>
-                          )}
-                        </Button>
-                      )}
-                      {/* Navigate to Feed Button - Show when logged in and not on feed */}
-                      {this.state.browserStatus === 'Open' && 
-                       this.state.loginStatus === 'Logged In' && 
-                       !this.state.currentTab.url.includes('/feed') && (
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={this.handleNavigateToFeed}
-                          disabled={this.state.isNavigating}
-                          className="bg-indigo-600 hover:bg-indigo-700 text-white border-0"
-                        >
-                          {this.state.isNavigating ? (
-                            <>
-                              <LoadingInline size="xs" variant="white" className="mr-2" />
-                              Navigating...
-                            </>
-                          ) : (
-                            <>
-                              <Home className="h-4 w-4 mr-1" />
-                              LinkedIn Feed
-                            </>
-                          )}
-                        </Button>
-                      )}
                     </div>
                     {/* Login Steps Indicator */}
                     {this.state.showLoginSteps && (
@@ -1034,6 +1006,105 @@ class App extends React.Component {
                     )}
                   </CardContent>
                 </Card>
+
+                {/* Real-time Scraping Progress */}
+                {this.state.scrapingProgress.currentSearch && (
+                  <Card className="border-blue-200 dark:border-blue-800">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
+                        <Eye className="h-5 w-5" />
+                        Real-time Scraping Progress
+                      </CardTitle>
+                      <CardDescription>
+                        Live monitoring of profile extraction for: {this.state.scrapingProgress.currentSearch}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {/* Progress Summary */}
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div className="text-center p-2 bg-muted/20 rounded">
+                          <div className="text-lg font-bold text-blue-600">
+                            {this.state.scrapingProgress.foundCount}
+                          </div>
+                          <div className="text-xs text-muted-foreground">Found</div>
+                        </div>
+                        <div className="text-center p-2 bg-muted/20 rounded">
+                          <div className="text-lg font-bold text-green-600">
+                            {this.state.scrapingProgress.completedProfiles || 0}
+                          </div>
+                          <div className="text-xs text-muted-foreground">Completed</div>
+                        </div>
+                        <div className="text-center p-2 bg-muted/20 rounded">
+                          <div className="text-lg font-bold text-orange-600">
+                            {this.state.scrapingProgress.currentProfile || 0}
+                          </div>
+                          <div className="text-xs text-muted-foreground">Processing</div>
+                        </div>
+                        <div className="text-center p-2 bg-muted/20 rounded">
+                          <div className="text-lg font-bold text-red-600">
+                            {this.state.scrapingProgress.errorCount || 0}
+                          </div>
+                          <div className="text-xs text-muted-foreground">Errors</div>
+                        </div>
+                      </div>
+
+                      {/* Current Profile Processing */}
+                      {this.state.scrapingProgress.currentProfileName && (
+                        <div className="p-3 bg-muted/10 rounded border">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="font-medium text-sm">
+                                Processing: {this.state.scrapingProgress.currentProfileName}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                Profile {this.state.scrapingProgress.currentProfile} of {this.state.scrapingProgress.totalProfiles}
+                              </div>
+                            </div>
+                            <LoadingInline size="sm" variant="primary" />
+                          </div>
+                          <div className="mt-2">
+                            <Progress 
+                              value={
+                                this.state.scrapingProgress.totalProfiles > 0 
+                                  ? (this.state.scrapingProgress.currentProfile / this.state.scrapingProgress.totalProfiles) * 100 
+                                  : 0
+                              } 
+                              className="w-full h-2" 
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Status Message */}
+                      {this.state.scrapingProgress.status && (
+                        <div className="text-xs text-muted-foreground bg-muted/10 p-2 rounded">
+                          Status: {this.state.scrapingProgress.status}
+                        </div>
+                      )}
+
+                      {/* Search Results Preview */}
+                      {this.state.scrapingProgress.searchResults.length > 0 && (
+                        <div className="space-y-2">
+                          <div className="text-sm font-medium">Found Profiles:</div>
+                          <div className="space-y-1 max-h-32 overflow-y-auto">
+                            {this.state.scrapingProgress.searchResults.slice(0, 3).map((profile, index) => (
+                              <div key={index} className="text-xs p-2 bg-muted/10 rounded flex justify-between">
+                                <span>{profile.name}</span>
+                                <span className="text-muted-foreground">{profile.subtitle}</span>
+                              </div>
+                            ))}
+                            {this.state.scrapingProgress.searchResults.length > 3 && (
+                              <div className="text-xs text-muted-foreground text-center">
+                                + {this.state.scrapingProgress.searchResults.length - 3} more profiles
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
                 {/* Scraping Controller */}
                 <Card>
                   <CardHeader>
@@ -1059,7 +1130,7 @@ class App extends React.Component {
                       )}
                       {this.state.currentCsvFile && this.state.scrapingStatus === 'Running' && (
                         <div className="text-xs text-green-600 dark:text-green-400 flex items-center">
-                          <LoadingDots size="sm" variant="success" className="mr-2" />
+                          <LoadingInline size="sm" variant="success" className="mr-2" />
                           Real-time save: {this.state.currentCsvFile.split('/').pop() || this.state.currentCsvFile}
                         </div>
                       )}
@@ -1073,7 +1144,7 @@ class App extends React.Component {
                       >
                         {this.state.scrapingStatus === 'Running' ? (
                           <>
-                            <LoadingDots size="sm" variant="white" className="mr-2" />
+                            <LoadingButton size="sm" variant="white" className="mr-2" />
                             Running Alumni Search
                           </>
                         ) : (

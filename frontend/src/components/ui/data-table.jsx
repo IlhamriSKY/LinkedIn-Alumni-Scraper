@@ -290,9 +290,9 @@ export function DataTable({
   if (isLoading && normalizedData.length === 0) {
     return (
       <div className="w-full">
-        <div className="flex items-center py-4">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-          <span className="ml-2">Loading data...</span>
+        <div className="flex items-center justify-center py-8">
+          <div className="w-6 h-6 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"></div>
+          <span className="ml-3 text-sm text-muted-foreground">Loading data...</span>
         </div>
       </div>
     )
@@ -429,7 +429,7 @@ export function DataTable({
       {/* Loading indicator for scraping in progress */}
       {isLoading && normalizedData.length > 0 && (
         <div className="flex items-center justify-center py-4 text-sm text-muted-foreground">
-          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
+          <div className="w-4 h-4 border border-blue-500/30 border-t-blue-500 rounded-full animate-spin mr-2"></div>
           Scraping in progress...
         </div>
       )}

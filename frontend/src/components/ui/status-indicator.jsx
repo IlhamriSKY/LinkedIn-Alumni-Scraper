@@ -22,7 +22,7 @@ export const StatusIndicator = ({
           <div className="relative w-2 h-2 bg-green-500 rounded-full"></div>
         </div>
         
-        {/* Connected Badge */}
+        {/* Connected Badge - No pulse */}
         <Badge className="bg-green-500 hover:bg-green-600 text-white border-green-500">
           {connectedText}
         </Badge>
@@ -37,7 +37,7 @@ export const StatusIndicator = ({
         <div className="w-2 h-2 bg-red-500 rounded-full"></div>
       </div>
       
-      {/* Disconnected Badge */}
+      {/* Disconnected Badge - No pulse */}
       <Badge variant="destructive">
         {disconnectedText}
       </Badge>
@@ -81,7 +81,7 @@ export const PulseBadge = ({
     return (
       <div className="relative inline-flex">
         {/* Pulse Ring */}
-        <div className={cn("absolute inset-0 rounded-md animate-ping opacity-75", colors.ring)}></div>
+        <div className={cn("absolute inset-0 rounded-md animate-ping opacity-30", colors.ring)}></div>
         
         {/* Badge */}
         <Badge 

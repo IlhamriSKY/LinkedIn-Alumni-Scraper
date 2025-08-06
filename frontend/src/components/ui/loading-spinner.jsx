@@ -1,40 +1,38 @@
 import React from 'react'
 import { cn } from '@/lib/utils'
+
+// Minimalist Spinner Component with Better Visibility
 const LoadingSpinner = ({ 
   size = 'md', 
   variant = 'primary', 
   className = '',
   children = null,
-  showText = true,
-  text = 'Loading...'
+  showText = false,
+  text = ''
 }) => {
   const sizeClasses = {
-    xs: 'w-3 h-3',
-    sm: 'w-4 h-4', 
-    md: 'w-5 h-5',
-    lg: 'w-6 h-6',
-    xl: 'w-8 h-8'
+    xs: 'w-3 h-3 border-2',
+    sm: 'w-4 h-4 border-2', 
+    md: 'w-5 h-5 border-2',
+    lg: 'w-6 h-6 border-[3px]',
+    xl: 'w-8 h-8 border-[3px]'
   }
+  
+  // Enhanced colors with better dark/light mode support
   const variantClasses = {
-    primary: 'border-blue-500',
-    secondary: 'border-gray-500',
-    success: 'border-green-500',
-    danger: 'border-red-500',
-    warning: 'border-yellow-500',
-    white: 'border-white'
+    primary: 'border-blue-200/40 border-t-blue-500 dark:border-blue-300/30 dark:border-t-blue-400',
+    secondary: 'border-gray-200/40 border-t-gray-600 dark:border-gray-600/40 dark:border-t-gray-300',
+    success: 'border-green-200/40 border-t-green-500 dark:border-green-300/30 dark:border-t-green-400',
+    danger: 'border-red-200/40 border-t-red-500 dark:border-red-300/30 dark:border-t-red-400',
+    warning: 'border-yellow-200/40 border-t-yellow-500 dark:border-yellow-300/30 dark:border-t-yellow-400',
+    white: 'border-white/40 border-t-white'
   }
-  const textSizeClasses = {
-    xs: 'text-xs',
-    sm: 'text-sm',
-    md: 'text-sm', 
-    lg: 'text-base',
-    xl: 'text-lg'
-  }
+
   if (children) {
     return (
-      <div className={cn("flex items-center gap-2", className)}>
+      <div className={cn("flex items-center gap-1.5", className)}>
         <div className={cn(
-          "animate-spin rounded-full border-2 border-t-transparent",
+          "animate-spin rounded-full",
           sizeClasses[size],
           variantClasses[variant]
         )} />
@@ -42,95 +40,62 @@ const LoadingSpinner = ({
       </div>
     )
   }
+
   return (
-    <div className={cn("flex items-center gap-2", className)}>
+    <div className={cn("flex items-center gap-1.5", className)}>
       <div className={cn(
-        "animate-spin rounded-full border-2 border-t-transparent",
+        "animate-spin rounded-full",
         sizeClasses[size],
         variantClasses[variant]
       )} />
-      {showText && (
-        <span className={cn(
-          "font-medium text-muted-foreground",
-          textSizeClasses[size]
-        )}>
+      {showText && text && (
+        <span className="text-xs text-muted-foreground">
           {text}
         </span>
       )}
     </div>
   )
 }
-const LoadingButton = ({ size = 'sm', variant = 'white', text = 'Loading...', className = '' }) => (
+// Simplified Loading Components
+const LoadingButton = ({ size = 'sm', variant = 'white', className = '' }) => (
   <LoadingSpinner 
     size={size} 
     variant={variant} 
-    text={text} 
     className={className}
   />
 )
-const LoadingPage = ({ text = 'Loading content...', className = '' }) => (
-  <div className={cn("flex flex-col items-center justify-center py-12", className)}>
-    <LoadingSpinner size="lg" text={text} />
-  </div>
-)
-const LoadingCard = ({ text = 'Loading...', className = '' }) => (
+
+const LoadingPage = ({ className = '' }) => (
   <div className={cn("flex items-center justify-center py-8", className)}>
-    <LoadingSpinner size="md" text={text} />
+    <LoadingSpinner size="lg" variant="primary" />
   </div>
 )
+
+const LoadingCard = ({ className = '' }) => (
+  <div className={cn("flex items-center justify-center py-6", className)}>
+    <LoadingSpinner size="md" variant="primary" />
+  </div>
+)
+
 const LoadingInline = ({ size = 'sm', variant = 'primary', className = '' }) => (
   <LoadingSpinner 
     size={size} 
     variant={variant} 
-    showText={false} 
     className={className}
   />
 )
+
 const LoadingPulse = ({ className = '', children }) => (
-  <div className={cn("animate-pulse", className)}>
+  <div className={cn("opacity-60", className)}>
     {children}
   </div>
 )
-const LoadingDots = ({ size = 'md', variant = 'primary', className = '' }) => {
-  const dotSizeClasses = {
-    sm: 'w-1 h-1',
-    md: 'w-2 h-2',
-    lg: 'w-3 h-3'
-  }
-  const dotColorClasses = {
-    primary: 'bg-blue-500',
-    secondary: 'bg-gray-500',
-    success: 'bg-green-500',
-    danger: 'bg-red-500',
-    warning: 'bg-yellow-500',
-    white: 'bg-white'
-  }
-  return (
-    <div className={cn("flex items-center space-x-1", className)}>
-      <div className={cn(
-        "rounded-full animate-bounce",
-        dotSizeClasses[size],
-        dotColorClasses[variant]
-      )} style={{ animationDelay: '0ms' }} />
-      <div className={cn(
-        "rounded-full animate-bounce",
-        dotSizeClasses[size],
-        dotColorClasses[variant]
-      )} style={{ animationDelay: '150ms' }} />
-      <div className={cn(
-        "rounded-full animate-bounce",
-        dotSizeClasses[size],
-        dotColorClasses[variant]
-      )} style={{ animationDelay: '300ms' }} />
-    </div>
-  )
-}
+
 export { 
   LoadingSpinner, 
   LoadingButton, 
   LoadingPage, 
   LoadingCard, 
   LoadingInline, 
-  LoadingPulse,
-  LoadingDots
+  LoadingPulse
 }

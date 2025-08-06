@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircle, Circle, Loader2, XCircle } from 'lucide-react';
+import { CheckCircle, Circle, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const LoginSteps = ({ currentStep, steps, isError = false, className }) => {
@@ -13,7 +13,9 @@ const LoginSteps = ({ currentStep, steps, isError = false, className }) => {
     }
     
     if (stepIndex === currentStep) {
-      return <Loader2 className="h-5 w-5 text-blue-500 animate-spin" />;
+      return (
+        <div className="h-5 w-5 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+      );
     }
     
     return <Circle className="h-5 w-5 text-gray-400" />;
@@ -29,7 +31,9 @@ const LoginSteps = ({ currentStep, steps, isError = false, className }) => {
     }
     
     if (stepIndex === currentStep) {
-      return <Loader2 className="h-6 w-6 text-blue-500 animate-spin" />;
+      return (
+        <div className="h-6 w-6 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+      );
     }
     
     return (
