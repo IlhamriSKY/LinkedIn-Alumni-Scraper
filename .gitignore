@@ -1,18 +1,67 @@
-# Environment Variables
+# Environment Variables & Credentials
 .env
+.env.*
+!.env.example
 *.env
 credentials.env
+backend/.env
 
-# Data Files
-Linkedin Alumni Scraper/data/person_locations/indonesia_names.csv
-Linkedin Alumni Scraper/data/scraping_result/*.csv
-Linkedin Alumni Scraper/data/*.csv
+# Sensitive Data Files
+search_names.csv
+results/*.csv
+backend/data/*.csv
+backend/data/scraping_result/*.csv
 
-# Python
+# Node.js Dependencies
+node_modules/
+backend/node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Logs & Debug Files
+logs/
+backend/logs/
+*.log
+debug.log
+error.log
+
+# Browser Data & Sessions
+backend/driver/
+backend/browser-data/
+chromedriver.exe
+browser-data/
+session-data/
+
+# IDE and Editor Files
+.vscode/
+.idea/
+*.swp
+*.swo
+.vs/
+
+# OS Generated Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary Files
+temp/
+tmp/
+*.tmp
+*.temp
+.cache/
+
+# Python (Legacy)
 __pycache__/
-Linkedin Alumni Scraper/__pycache__
-Linkedin Alumni Scraper/formatter/__pycache__
-Linkedin Alumni Scraper/core/__pycache__
 *.py[cod]
 *$py.class
 *.so
@@ -36,7 +85,7 @@ share/python-wheels/
 *.egg
 MANIFEST
 
-# Virtual Environments
+# Virtual Environments (Legacy Python)
 venv/
 env/
 new_env/
@@ -45,51 +94,12 @@ ENV/
 env.bak/
 venv.bak/
 
-# Scraped Data (keep structure but ignore sensitive data)
-data/*.csv
-data/scraping_result/*.csv
-data/scraping_progress.txt
-Linkedin Alumni Scraper/data/*.csv
-Linkedin Alumni Scraper/data/scraping_result/*.csv
-
-# Logs (centralized in Alumni Scraper folder)
-Linkedin Alumni Scraper/logs/
-logs/
-*.log
-
-# IDE and Editor files
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS generated files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-
-# Temporary files
-temp/
-tmp/
-*.tmp
-*.temp
-
-# Node.js (for frontend)
-node_modules/
-Linkedin Alumni Scraper/frontend/node_modules/
-Linkedin Alumni Scraper/frontend/dist/
-.npmrc
-
-# Test files (keep professional unit tests)
-tests/test_*.pyc
-tests/__pycache__/
-
-# Coverage reports
+# Coverage Reports
 htmlcov/
 .coverage
 .coverage.*
 coverage.xml
+
+# Package Lock Files (keep for consistency)
+package-lock.json
+yarn.lock

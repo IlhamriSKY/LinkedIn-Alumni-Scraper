@@ -1,0 +1,65 @@
+{
+  "name": "linkedin-alumni-scraper-backend",
+  "version": "2.0.0",
+  "description": "Node.js backend for LinkedIn Alumni Scraper with Puppeteer",
+  "main": "start.js",
+  "type": "module",
+  "scripts": {
+    "start": "node start.js",
+    "dev": "nodemon start.js",
+    "build": "echo 'No build step required for Node.js backend'",
+    "test": "node --test",
+    "lint": "eslint .",
+    "format": "prettier --write ."
+  },
+  "keywords": [
+    "linkedin",
+    "scraper",
+    "puppeteer",
+    "nodejs",
+    "express",
+    "socket.io",
+    "automation"
+  ],
+  "author": "LinkedIn Alumni Scraper Team",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.21.2",
+    "socket.io": "^4.8.0",
+    "puppeteer": "^23.10.4",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "puppeteer-extra-plugin-user-preferences": "^2.4.1",
+    "winston": "^3.17.0",
+    "winston-daily-rotate-file": "^5.0.0",
+    "csv-parser": "^3.0.0",
+    "csv-writer": "^1.6.0",
+    "dotenv": "^16.4.7",
+    "cors": "^2.8.5",
+    "helmet": "^8.0.0",
+    "compression": "^1.7.4",
+    "morgan": "^1.10.0",
+    "fs-extra": "^11.2.0",
+    "path": "^0.12.7",
+    "url": "^0.11.4"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.7",
+    "eslint": "^9.17.0",
+    "prettier": "^3.4.2",
+    "@types/express": "^5.0.0",
+    "@types/cors": "^2.8.17"
+  },
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/linkedin-alumni-scraper"
+  },
+  "bugs": {
+    "url": "https://github.com/your-username/linkedin-alumni-scraper/issues"
+  },
+  "homepage": "https://github.com/your-username/linkedin-alumni-scraper#readme"
+}

@@ -1,0 +1,51 @@
+{
+  "name": "linkedin-alumni-scraper",
+  "version": "2.0.0",
+  "description": "Modern LinkedIn Alumni Data Collection Tool with Node.js backend and React frontend",
+  "type": "module",
+  "main": "start.js",
+  "scripts": {
+    "start": "node start.js",
+    "dev": "node start.js --dev",
+    "prod": "node start.js",
+    "install:deps": "node start.js --install",
+    "backend": "cd backend && npm start",
+    "frontend": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build",
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "clean": "cd frontend && rm -rf dist && cd ../backend && rm -rf logs",
+    "clean:all": "cd frontend && rm -rf dist node_modules && cd ../backend && rm -rf logs node_modules && rm -rf node_modules",
+    "update:all": "npm update && cd backend && npm update && cd ../frontend && npm update",
+    "test": "cd backend && npm test",
+    "lint": "cd backend && npm run lint",
+    "format": "cd backend && npm run format"
+  },
+  "keywords": [
+    "linkedin",
+    "scraper",
+    "alumni",
+    "automation",
+    "nodejs",
+    "react",
+    "puppeteer",
+    "socket.io"
+  ],
+  "author": "IlhamriSKY",
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^16.4.7"
+  },
+  "devDependencies": {},
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/IlhamriSKY/LinkedIn-Alumni-Scraper.git"
+  },
+  "bugs": {
+    "url": "https://github.com/IlhamriSKY/LinkedIn-Alumni-Scraper/issues"
+  },
+  "homepage": "https://github.com/IlhamriSKY/LinkedIn-Alumni-Scraper#readme"
+}
