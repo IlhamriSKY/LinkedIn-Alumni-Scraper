@@ -7,7 +7,6 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table"
-
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -30,8 +29,6 @@ import {
   MapPin,
   ArrowUpDown
 } from 'lucide-react'
-
-// Column definitions for alumni data
 export const columns = [
   {
     accessorKey: "name",
@@ -159,7 +156,7 @@ export const columns = [
     cell: ({ row }) => {
       const bio = row.getValue("bio") || row.original.Bio || ""
       return (
-        <div className="max-w-[500px]">
+        <div className="max-w-[200px]">
           <span className="text-xs text-muted-foreground truncate" title={bio}>
             {bio.length > 50 ? bio.substring(0, 50) + "..." : bio || "N/A"}
           </span>
@@ -184,7 +181,6 @@ export const columns = [
     cell: ({ row }) => {
       const scrapedAt = row.getValue("scrapedAt") || row.original["Scraped At"]
       if (!scrapedAt) return "Unknown"
-      
       try {
         const date = new Date(scrapedAt)
         return (
@@ -206,9 +202,7 @@ export const columns = [
     header: "Actions",
     cell: ({ row }) => {
       const profileUrl = row.original.profileUrl || row.original["Profile URL"]
-      
       if (!profileUrl) return null
-      
       return (
         <Button
           variant="ghost"
@@ -222,7 +216,6 @@ export const columns = [
     },
   },
 ]
-
 export function DataTable({
   columns,
   data,
@@ -236,8 +229,6 @@ export function DataTable({
     pageIndex: 0,
     pageSize: 10,
   })
-
-  // Normalize data to ensure consistent field names
   const normalizedData = React.useMemo(() => {
     return data.map(item => ({
       name: item.name || item.Name || 'Unknown',
@@ -251,7 +242,6 @@ export function DataTable({
       ...item // Keep original data as well
     }))
   }, [data])
-
   const table = useReactTable({
     data: normalizedData,
     columns,
@@ -271,15 +261,11 @@ export function DataTable({
     },
     globalFilterFn: "includesString",
   })
-
   const handleExport = () => {
     if (normalizedData.length === 0) return
-
-    // Create CSV content
     const headers = [
       'Name', 'Position', 'Company', 'Location', 'Found', 'Scraped At'
     ]
-    
     const csvContent = [
       headers.join(','),
       ...normalizedData.map(row => [
@@ -291,8 +277,6 @@ export function DataTable({
         `"${(row.scrapedAt || '').replace(/"/g, '""')}"`
       ].join(','))
     ].join('\n')
-
-    // Download CSV
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
     const link = document.createElement('a')
     const url = URL.createObjectURL(blob)
@@ -303,7 +287,6 @@ export function DataTable({
     link.click()
     document.body.removeChild(link)
   }
-
   if (isLoading && normalizedData.length === 0) {
     return (
       <div className="w-full">
@@ -314,7 +297,6 @@ export function DataTable({
       </div>
     )
   }
-
   return (
     <div className="w-full">
       {/* Header */}
@@ -326,7 +308,6 @@ export function DataTable({
           </p>
         </div>
       </div>
-
       {/* Search */}
       <div className="flex items-center justify-between py-4">
         <div className="relative max-w-sm">
@@ -349,7 +330,6 @@ export function DataTable({
           Export CSV
         </Button>
       </div>
-
       {/* Table */}
       <div className="rounded-md border">
         <Table>
@@ -401,7 +381,6 @@ export function DataTable({
           </TableBody>
         </Table>
       </div>
-
       {/* Pagination */}
       <div className="flex items-center justify-between space-x-2 py-4">
         <div className="flex items-center space-x-2">
@@ -447,7 +426,6 @@ export function DataTable({
           </div>
         </div>
       </div>
-
       {/* Loading indicator for scraping in progress */}
       {isLoading && normalizedData.length > 0 && (
         <div className="flex items-center justify-center py-4 text-sm text-muted-foreground">

@@ -30,14 +30,11 @@ import {
   User,
   Eye
 } from 'lucide-react'
-
-// Dynamic API configuration from environment variables
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
 let APP_NAME = 'LinkedIn Alumni Scraper';
-let UNIVERSITY_NAME = 'Your University';
-
+let UNIVERSITY_NAME = 'Universitas Indonesia';
 /**
  * Main LinkedIn Alumni Scraper Application
  * Professional dashboard with OOP architecture and Socket.IO real-time updates
@@ -45,7 +42,6 @@ let UNIVERSITY_NAME = 'Your University';
 class App extends React.Component {
   constructor(props) {
     super(props);
-    
     this.state = {
       currentSection: 'dashboard',
       backendConnected: false,
@@ -95,7 +91,6 @@ class App extends React.Component {
       currentCsvFile: null, // Track current real-time CSV file
       currentCsvFileName: null, // Track CSV file name for DataTable
       csvFileStats: null, // CSV file statistics
-      // Login steps state
       loginSteps: [
         { title: 'Checking Status', description: 'Verifying current authentication' },
         { title: 'Navigate Login', description: 'Opening LinkedIn login page' },
@@ -106,92 +101,61 @@ class App extends React.Component {
       showLoginSteps: false,
       loginError: false
     };
-
-    // Initialize Socket.IO connection using singleton service
     this.componentId = 'main-app';
     this.setupSocketListeners();
   }
-
   componentDidMount() {
-    // Start periodic login status check
     this.startPeriodicLoginCheck();
-    
-    // Start real-time browser monitoring
     this.startBrowserMonitoring();
-    
-    // Load initial configuration
     this.loadConfig();
-    
-    // Load CSV data for DataTable
     this.loadCsvData();
-    
-    // Start periodic CSV refresh for DataTable
     this.startCsvDataRefresh();
   }
-
   componentWillUnmount() {
-    // Clean up socket listeners for this component
     socketService.removeListeners(this.componentId);
-    
-    // Clear periodic check
     this.stopPeriodicLoginCheck();
-    
-    // Clear browser monitoring
     this.stopBrowserMonitoring();
-    
-    // Clear CSV data refresh
     this.stopCsvDataRefresh();
   }
-
   startPeriodicLoginCheck = () => {
-    // Check login status every 10 seconds when browser is open
     this.loginCheckInterval = setInterval(() => {
       if (this.state.browserStatus === 'Open' && this.state.loginStatus === 'Not Logged In') {
         this.checkLoginStatusSilently();
       }
     }, 10000); // Check every 10 seconds
   };
-
   stopPeriodicLoginCheck = () => {
     if (this.loginCheckInterval) {
       clearInterval(this.loginCheckInterval);
       this.loginCheckInterval = null;
     }
   };
-
   startBrowserMonitoring = () => {
-    // Monitor browser info every 2 seconds for real-time updates
     this.browserMonitorInterval = setInterval(() => {
       this.fetchBrowserInfo();
     }, 2000); // Check every 2 seconds for responsive updates
   };
-
   stopBrowserMonitoring = () => {
     if (this.browserMonitorInterval) {
       clearInterval(this.browserMonitorInterval);
       this.browserMonitorInterval = null;
     }
   };
-
   startCsvDataRefresh = () => {
-    // Refresh CSV data every 5 seconds for real-time updates
     this.csvRefreshInterval = setInterval(() => {
       this.loadCsvData();
     }, 5000); // Refresh every 5 seconds
   };
-
   stopCsvDataRefresh = () => {
     if (this.csvRefreshInterval) {
       clearInterval(this.csvRefreshInterval);
       this.csvRefreshInterval = null;
     }
   };
-
   loadCsvData = async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/csv/current`);
       const result = await response.json();
-      
       if (result.success) {
         this.setState({
           alumniData: result.data || [],
@@ -203,14 +167,11 @@ class App extends React.Component {
       console.error('Error loading CSV data:', error);
     }
   };
-
   fetchBrowserInfo = async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/browser/info`);
       const result = await response.json();
-      
       if (result.success) {
-        // Update state with latest browser info
         this.setState(prevState => ({
           ...prevState,
           browserStatus: result.browserActive ? 'Open' : 'Closed',
@@ -226,14 +187,11 @@ class App extends React.Component {
         }));
       }
     } catch (error) {
-      // Silently handle errors for real-time monitoring
       console.debug('Browser info fetch error:', error);
     }
   };
-
   getPageTypeFromUrl = (url) => {
     if (!url) return 'No page loaded';
-    
     if (url.includes('linkedin.com/feed')) return 'LinkedIn Feed';
     if (url.includes('linkedin.com/login')) return 'Login Page';
     if (url.includes('linkedin.com/school')) return 'University Alumni';
@@ -243,10 +201,8 @@ class App extends React.Component {
     if (url.startsWith('about:blank')) return 'Blank Page';
     return 'External Page';
   };
-
   getPageDescriptionFromUrl = (url) => {
     if (!url) return 'No page is currently loaded';
-    
     if (url.includes('linkedin.com/feed')) return 'Main LinkedIn feed page';
     if (url.includes('linkedin.com/login')) return 'LinkedIn authentication page';
     if (url.includes('linkedin.com/school')) return 'Alumni directory page';
@@ -256,7 +212,6 @@ class App extends React.Component {
     if (url.startsWith('about:blank')) return 'Empty browser tab';
     return 'Non-LinkedIn website';
   };
-
   checkLoginStatusSilently = async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/login/check`, {
@@ -264,7 +219,6 @@ class App extends React.Component {
         headers: { 'Content-Type': 'application/json' }
       });
       const result = await response.json();
-      
       if (result.success && result.alreadyLoggedIn) {
         this.setState({ loginStatus: 'Logged In' });
         console.log('Periodic check: User is now logged in');
@@ -274,8 +228,6 @@ class App extends React.Component {
       console.log('Periodic login check failed:', error);
     }
   };
-
-  // Toast notification helper
   showToast = (variant, title, description) => {
     toast({
       variant: variant,
@@ -283,28 +235,23 @@ class App extends React.Component {
       description: description,
     });
   };
-
   setupSocketListeners = () => {
     socketService.on('connect', () => {
       console.log('Connected to backend via Socket.IO');
       this.setState({ backendConnected: true });
       this.showToast('success', 'Backend Connected', 'Successfully connected to server');
-      // Load search names count when connected
       this.loadSearchNamesCount();
     }, this.componentId);
-
     socketService.on('disconnect', () => {
       console.log('Disconnected from backend');
       this.setState({ backendConnected: false });
       this.showToast('destructive', 'Backend Disconnected', 'Connection to server lost');
     }, this.componentId);
-
     socketService.on('connect_error', (error) => {
       console.error('Socket connection error:', error);
       this.setState({ backendConnected: false });
       this.showToast('destructive', 'Connection Error', 'Failed to connect to server');
     }, this.componentId);
-
     socketService.on('stateUpdate', (data) => {
       console.log('Received state update:', data);
       this.setState(prevState => ({
@@ -327,8 +274,6 @@ class App extends React.Component {
           totalProfiles: prevState.totalSearchNames // Use search names count
         }
       }));
-      
-      // Auto-detect login from LinkedIn feed access
       if (data.browserOpen && this.state.currentTab.isLinkedIn && this.state.currentTab.type === 'LinkedIn Feed') {
         console.log('Auto-detected login from LinkedIn feed access');
         this.setState(prevState => ({
@@ -337,17 +282,13 @@ class App extends React.Component {
         }));
       }
     }, this.componentId);
-
     socketService.on('pageUpdate', (data) => {
       console.log('Page update:', data);
       const pageInfo = this.getPageInfo(data);
-      
       this.setState({ 
         currentPage: data.url || data.currentPage || '',
         currentTab: pageInfo
       });
-      
-      // Auto-detect login status from page info
       if (pageInfo.isLinkedIn && (pageInfo.type === 'LinkedIn Feed' || pageInfo.type === 'Profile Page')) {
         console.log('Auto-detected LinkedIn access - updating login status');
         this.setState(prevState => ({
@@ -355,8 +296,6 @@ class App extends React.Component {
           loginStatus: 'Logged In'
         }));
       }
-      
-      // Show toast for significant page changes (not for real-time updates)
       if (data.tabChange && !data.realTimeUpdate) {
         if (pageInfo.type === 'LinkedIn Feed') {
           this.showToast('success', 'LinkedIn Access', 'Successfully accessed LinkedIn feed');
@@ -365,7 +304,6 @@ class App extends React.Component {
         }
       }
     }, this.componentId);
-
     socketService.on('loginUpdate', (data) => {
       console.log('Login update:', data);
       this.setState({ 
@@ -378,12 +316,9 @@ class App extends React.Component {
       if (data.success) {
         this.showToast('success', 'Login Successful', 'Successfully logged into LinkedIn');
       } else if (!data.alreadyLoggedIn && data.showError !== false) {
-        // Only show login failed toast if it's not an auto-check and showError is not explicitly false
         this.showToast('destructive', 'Login Failed', data.error || 'Failed to login to LinkedIn');
       }
     }, this.componentId);
-
-    // New socket listener for login steps
     socketService.on('loginStep', (data) => {
       console.log('Login step:', data);
       this.setState({
@@ -391,8 +326,6 @@ class App extends React.Component {
         showLoginSteps: true,
         loginError: data.error || false
       });
-      
-      // Update the step description if provided
       if (data.title && data.step >= 0 && data.step < this.state.loginSteps.length) {
         const updatedSteps = [...this.state.loginSteps];
         updatedSteps[data.step] = {
@@ -402,8 +335,6 @@ class App extends React.Component {
         };
         this.setState({ loginSteps: updatedSteps });
       }
-      
-      // Hide steps when login is completed successfully
       if (data.completed) {
         setTimeout(() => {
           this.setState({ 
@@ -413,42 +344,31 @@ class App extends React.Component {
         }, 2000); // Hide after 2 seconds
       }
     }, this.componentId);
-
     socketService.on('browserUpdate', (data) => {
       console.log('Browser update:', data);
       const browserStatus = data.status === 'opening' ? 'Opening' : 
                            data.status === 'open' ? 'Open' : 'Closed';
-      
       this.setState({ 
         browserStatus: browserStatus,
         isLoading: data.status === 'opening',
         currentPage: data.currentPage || data.url || '',
         currentTab: this.getPageInfo(data)
       });
-
-      // Show toast for browser events
       if (data.status === 'open') {
         this.showToast('success', 'Browser Opened', 'Chrome browser is now ready');
       } else if (data.status === 'closed') {
         this.showToast('info', 'Browser Closed', 'Chrome browser has been closed');
       }
     }, this.componentId);
-
     socketService.on('scrapingResult', (data) => {
       console.log('Scraping result:', data);
       this.setState(prevState => ({
         scrapingResults: [...prevState.scrapingResults, data]
-        // Don't update alumniData here - let CSV refresh handle it
       }));
-      
-      // Trigger immediate CSV refresh to get updated data
       this.loadCsvData();
     }, this.componentId);
-
-    // New tab monitoring socket listener
     socketService.on('tabUpdate', (data) => {
       console.log('Tab update received:', data);
-      // Update the current tab info if needed (removed tabCount)
       this.setState(prevState => ({
         ...prevState,
         currentTab: {
@@ -456,22 +376,16 @@ class App extends React.Component {
           timestamp: data.timestamp
         }
       }));
-      
-      // Don't show toast for real-time updates to avoid spam
       if (!data.realTimeUpdate) {
         console.log(`Tab update processed`);
       }
     }, this.componentId);
   }
-
   getPageInfo = (data) => {
     const url = data.url || data.currentPage || '';
     const title = data.title || '';
-    
-    // Extract meaningful page information
     let pageType = 'Unknown Page';
     let pageDescription = '';
-    
     if (!url) {
       return {
         type: 'No page loaded',
@@ -479,7 +393,6 @@ class App extends React.Component {
         description: 'No page is currently loaded'
       };
     }
-    
     if (url.includes('linkedin.com/feed')) {
       pageType = 'LinkedIn Feed';
       pageDescription = 'Main LinkedIn feed page';
@@ -505,7 +418,6 @@ class App extends React.Component {
       pageType = 'External Page';
       pageDescription = 'Non-LinkedIn website';
     }
-    
     return {
       type: pageType,
       title: title || pageType,
@@ -515,34 +427,25 @@ class App extends React.Component {
       isLinkedIn: data.isLinkedIn || url.includes('linkedin.com')
     };
   }
-
   loadConfig = async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/config`);
       const config = await response.json();
-      
-      // Configuration is now loaded from environment variables
-      // No need to update global variables
-      
       this.setState({ 
         config: config,
         universityName: config.universityName
       });
-      
       console.log('Configuration loaded from backend:', config);
     } catch (error) {
       console.error('Error loading configuration:', error);
       this.showToast('destructive', 'Config Error', 'Failed to load configuration from backend');
     }
   }
-
   loadSearchNamesCount = async () => {
     try {
-      // Load config first if not already loaded
-      if (!this.state.config.universityName || this.state.config.universityName === 'Your University') {
+      if (!this.state.config.universityName || this.state.config.universityName === 'Universitas Indonesia') {
         await this.loadConfig();
       }
-      
       const response = await fetch(`${API_BASE_URL}/api/search-names-count`);
       const result = await response.json();
       if (result.success) {
@@ -559,16 +462,13 @@ class App extends React.Component {
       this.showToast('destructive', 'Data Loading Error', 'Failed to load search names count');
     }
   }
-
   handleOpenBrowser = async () => {
     this.setState({ isLoading: true, browserStatus: 'Opening' });
-    
     try {
       const response = await fetch(`${API_BASE_URL}/api/browser/open`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       });
-      
       const result = await response.json();
       if (result.success) {
         this.setState({ browserStatus: 'Open' });
@@ -584,7 +484,6 @@ class App extends React.Component {
       this.setState({ isLoading: false });
     }
   }
-
   handleLogin = async () => {
     this.setState({ 
       isLoggingIn: true, 
@@ -593,20 +492,15 @@ class App extends React.Component {
       currentLoginStep: 0,
       loginError: false
     });
-    
     try {
-      // First check if already logged in
       console.log('Checking current login status...');
       const checkResponse = await fetch(`${API_BASE_URL}/api/login/check`, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' }
       });
-      
       const checkResult = await checkResponse.json();
       console.log('Login check result:', checkResult);
-      
       if (checkResult.success && checkResult.loggedIn) {
-        // Already logged in
         this.setState({ 
           loginStatus: 'Logged In',
           isLoggingIn: false,
@@ -614,8 +508,6 @@ class App extends React.Component {
           showLoginSteps: true
         });
         this.showToast('info', 'Already Logged In', 'You are already logged in to LinkedIn');
-        
-        // Hide steps after delay
         setTimeout(() => {
           this.setState({ 
             showLoginSteps: false,
@@ -624,19 +516,15 @@ class App extends React.Component {
         }, 2000);
         return;
       }
-      
-      // Not logged in, proceed with login process
       console.log('Not logged in, starting login process...');
       this.setState({ 
         loginStatus: 'Logging In...',
         currentLoginStep: 1
       });
-      
       const response = await fetch(`${API_BASE_URL}/api/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       });
-      
       const result = await response.json();
       if (result.success) {
         this.setState({ 
@@ -644,8 +532,6 @@ class App extends React.Component {
           currentLoginStep: 3
         });
         this.showToast('success', 'Login Successful', 'Successfully logged into LinkedIn');
-        
-        // Hide steps after delay
         setTimeout(() => {
           this.setState({ 
             showLoginSteps: false,
@@ -671,11 +557,9 @@ class App extends React.Component {
       this.setState({ isLoggingIn: false });
     }
   }
-
   handleNavigateToProfile = async () => {
     console.log('Navigating to user profile...');
     this.setState({ isNavigating: true });
-    
     try {
       const response = await fetch(`${API_BASE_URL}/api/navigate-profile`, {
         method: 'POST',
@@ -683,10 +567,8 @@ class App extends React.Component {
           'Content-Type': 'application/json',
         },
       });
-      
       const result = await response.json();
       console.log('Profile navigation result:', result);
-      
       if (result.success) {
         this.showToast('success', 'Navigation Successful', 'Navigated to your profile page');
       } else {
@@ -700,40 +582,9 @@ class App extends React.Component {
       this.setState({ isNavigating: false });
     }
   }
-
-  handleNavigateToProfile = async () => {
-    console.log('Navigating to user profile...');
-    this.setState({ isNavigating: true });
-    
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/navigate-profile`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      const result = await response.json();
-      console.log('Profile navigation result:', result);
-      
-      if (result.success) {
-        this.showToast('success', 'Navigation Successful', 'Navigated to your profile');
-      } else {
-        console.error('Navigation failed:', result.message);
-        this.showToast('destructive', 'Navigation Error', result.message || 'Failed to navigate to profile');
-      }
-    } catch (error) {
-      console.error('Error navigating to profile:', error);
-      this.showToast('destructive', 'Navigation Error', 'Failed to navigate to profile');
-    } finally {
-      this.setState({ isNavigating: false });
-    }
-  }
-
   handleNavigateToFeed = async () => {
     console.log('Navigating to LinkedIn feed...');
     this.setState({ isNavigating: true });
-    
     try {
       const response = await fetch(`${API_BASE_URL}/api/navigate-feed`, {
         method: 'POST',
@@ -741,10 +592,8 @@ class App extends React.Component {
           'Content-Type': 'application/json',
         },
       });
-      
       const result = await response.json();
       console.log('Feed navigation result:', result);
-      
       if (result.success) {
         this.showToast('success', 'Navigation Successful', 'Navigated to LinkedIn feed');
       } else {
@@ -758,11 +607,9 @@ class App extends React.Component {
       this.setState({ isNavigating: false });
     }
   }
-
   handleNavigateUniversity = async () => {
     console.log('Navigating to university...');
     this.setState({ isNavigating: true });
-    
     try {
       const response = await fetch(`${API_BASE_URL}/api/navigate-university`, {
         method: 'POST',
@@ -770,10 +617,8 @@ class App extends React.Component {
           'Content-Type': 'application/json',
         },
       });
-      
       const result = await response.json();
       console.log('University navigation result:', result);
-      
       if (result.success) {
         this.showToast('info', 'Navigation Successful', 'Navigated to university alumni page');
       } else {
@@ -787,17 +632,14 @@ class App extends React.Component {
       this.setState({ isNavigating: false });
     }
   }
-
   handleStartScraping = async () => {
     console.log('Starting alumni-specific scraping with real-time CSV save...');
     this.setState({ isLoading: true, scrapingStatus: 'Running' });
-    
     try {
       const response = await fetch(`${API_BASE_URL}/api/scrape/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       });
-      
       const result = await response.json();
       if (result.success) {
         console.log('Alumni scraping started:', result.message);
@@ -816,17 +658,14 @@ class App extends React.Component {
       this.setState({ isLoading: false });
     }
   }
-
   handlePauseScraping = async () => {
     console.log('Pausing scraping...');
     this.setState({ isLoading: true });
-    
     try {
       const response = await fetch(`${API_BASE_URL}/api/scrape/pause`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       });
-      
       const result = await response.json();
       if (result.success) {
         this.setState({ scrapingStatus: 'Paused' });
@@ -843,17 +682,14 @@ class App extends React.Component {
       this.setState({ isLoading: false });
     }
   }
-
   handleResetSession = async () => {
     console.log('Resetting session...');
     this.setState({ isLoading: true });
-    
     try {
       const response = await fetch(`${API_BASE_URL}/api/scrape/reset`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       });
-      
       const result = await response.json();
       if (result.success) {
         this.setState({ 
@@ -867,8 +703,6 @@ class App extends React.Component {
           currentCsvFile: null,
           scrapingResults: []
         });
-        
-        // Reload CSV data after reset
         this.loadCsvData();
         console.log('Session reset:', result.message);
         this.showToast('info', 'Session Reset', 'Data scraping has been reset');
@@ -883,12 +717,10 @@ class App extends React.Component {
       this.setState({ isLoading: false });
     }
   }
-
   handleExportData = async () => {
     console.log('Exporting data...');
     try {
       const response = await fetch(`${API_BASE_URL}/api/download/results`);
-      
       if (response.ok) {
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
@@ -899,7 +731,6 @@ class App extends React.Component {
         link.click();
         document.body.removeChild(link);
         window.URL.revokeObjectURL(url);
-        
         this.showToast('success', 'Export Successful', 'Results file has been downloaded');
       } else {
         throw new Error('Failed to export data');
@@ -909,10 +740,8 @@ class App extends React.Component {
       this.showToast('destructive', 'Export Error', 'Failed to export results file');
     }
   }
-
   render() {
     const { stats, scrapingStatus, progress } = this.state;
-
     return (
       <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
         <div className="min-h-screen bg-background">
@@ -935,7 +764,6 @@ class App extends React.Component {
               </div>
             </div>
           </header>
-
           {/* Main Content */}
           <main className="container mx-auto p-6">
             <div className="space-y-6">
@@ -955,7 +783,6 @@ class App extends React.Component {
                   />
                 </div>
               </div>
-
               {/* Statistics Cards */}
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
                 <Card>
@@ -970,7 +797,6 @@ class App extends React.Component {
                     </p>
                   </CardContent>
                 </Card>
-
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Found</CardTitle>
@@ -983,7 +809,6 @@ class App extends React.Component {
                     </p>
                   </CardContent>
                 </Card>
-
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Not Found</CardTitle>
@@ -996,7 +821,6 @@ class App extends React.Component {
                     </p>
                   </CardContent>
                 </Card>
-
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Total Scraped</CardTitle>
@@ -1009,7 +833,6 @@ class App extends React.Component {
                     </p>
                   </CardContent>
                 </Card>
-
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Progress</CardTitle>
@@ -1023,7 +846,6 @@ class App extends React.Component {
                   </CardContent>
                 </Card>
               </div>
-
               {/* Progress and Controls */}
               <div className="space-y-6">
               {/* Browser Controller */}
@@ -1081,7 +903,6 @@ class App extends React.Component {
                         </div>
                       </div>
                     </div>
-                    
                     {/* Simplified Current Page Information with Real-time indicator */}
                     {this.state.currentPage && (
                       <div className="text-xs text-muted-foreground p-2 bg-muted/50 rounded border">
@@ -1094,7 +915,6 @@ class App extends React.Component {
                         </div>
                       </div>
                     )}
-                    
                     <div className="flex items-center space-x-2">
                       <Button
                         size="sm"
@@ -1106,7 +926,6 @@ class App extends React.Component {
                         <Chrome className="h-4 w-4 mr-1" />
                         {this.state.browserStatus === 'Opening' ? 'Opening...' : 'Open Browser'}
                       </Button>
-                      
                       {/* Login Button - Show when browser open and not logged in */}
                       {this.state.browserStatus === 'Open' && 
                        this.state.loginStatus === 'Not Logged In' && (
@@ -1130,7 +949,6 @@ class App extends React.Component {
                           )}
                         </Button>
                       )}
-                      
                       {/* Navigate University Button - Show only when on LinkedIn Feed specifically */}
                       {this.state.browserStatus === 'Open' && 
                        this.state.currentTab.type === 'LinkedIn Feed' && 
@@ -1155,7 +973,30 @@ class App extends React.Component {
                           )}
                         </Button>
                       )}
-
+                      {/* Navigate to My Profile Button - Show when logged in and not on profile */}
+                      {this.state.browserStatus === 'Open' && 
+                       this.state.loginStatus === 'Logged In' && 
+                       !this.state.currentTab.url.includes('/in/me') && (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={this.handleNavigateToProfile}
+                          disabled={this.state.isNavigating}
+                          className="bg-blue-600 hover:bg-blue-700 text-white border-0"
+                        >
+                          {this.state.isNavigating ? (
+                            <>
+                              <LoadingInline size="xs" variant="white" className="mr-2" />
+                              Navigating...
+                            </>
+                          ) : (
+                            <>
+                              <User className="h-4 w-4 mr-1" />
+                              My Profile
+                            </>
+                          )}
+                        </Button>
+                      )}
                       {/* Navigate to Feed Button - Show when logged in and not on feed */}
                       {this.state.browserStatus === 'Open' && 
                        this.state.loginStatus === 'Logged In' && 
@@ -1181,7 +1022,6 @@ class App extends React.Component {
                         </Button>
                       )}
                     </div>
-                    
                     {/* Login Steps Indicator */}
                     {this.state.showLoginSteps && (
                       <div className="mt-4 p-3 bg-muted/20 rounded-md border">
@@ -1194,7 +1034,6 @@ class App extends React.Component {
                     )}
                   </CardContent>
                 </Card>
-
                 {/* Scraping Controller */}
                 <Card>
                   <CardHeader>
@@ -1225,7 +1064,6 @@ class App extends React.Component {
                         </div>
                       )}
                     </div>
-                    
                     <div className="flex items-center space-x-2">
                       <Button
                         size="sm"
@@ -1268,7 +1106,6 @@ class App extends React.Component {
                     </div>
                   </CardContent>
                 </Card>
-
                 {/* Results DataTable - CSV Source */}
                 <AlumniDataTable 
                   data={this.state.alumniData}
@@ -1276,11 +1113,9 @@ class App extends React.Component {
                   isLoading={false}
                 />
                 </div>
-              
               {/* Remove Alumni Results View section since we no longer have view switching */}
             </div>
           </main>
-          
           {/* Toast Notifications */}
           <Toaster />
         </div>
@@ -1288,5 +1123,4 @@ class App extends React.Component {
     );
   }
 }
-
 export default App;

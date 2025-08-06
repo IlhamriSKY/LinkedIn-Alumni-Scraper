@@ -1,6 +1,5 @@
 import React from 'react'
 import { cn } from '@/lib/utils'
-
 const LoadingSpinner = ({ 
   size = 'md', 
   variant = 'primary', 
@@ -16,7 +15,6 @@ const LoadingSpinner = ({
     lg: 'w-6 h-6',
     xl: 'w-8 h-8'
   }
-
   const variantClasses = {
     primary: 'border-blue-500',
     secondary: 'border-gray-500',
@@ -25,7 +23,6 @@ const LoadingSpinner = ({
     warning: 'border-yellow-500',
     white: 'border-white'
   }
-
   const textSizeClasses = {
     xs: 'text-xs',
     sm: 'text-sm',
@@ -33,7 +30,6 @@ const LoadingSpinner = ({
     lg: 'text-base',
     xl: 'text-lg'
   }
-
   if (children) {
     return (
       <div className={cn("flex items-center gap-2", className)}>
@@ -46,7 +42,6 @@ const LoadingSpinner = ({
       </div>
     )
   }
-
   return (
     <div className={cn("flex items-center gap-2", className)}>
       <div className={cn(
@@ -65,8 +60,6 @@ const LoadingSpinner = ({
     </div>
   )
 }
-
-// Predefined loading components for common use cases
 const LoadingButton = ({ size = 'sm', variant = 'white', text = 'Loading...', className = '' }) => (
   <LoadingSpinner 
     size={size} 
@@ -75,19 +68,16 @@ const LoadingButton = ({ size = 'sm', variant = 'white', text = 'Loading...', cl
     className={className}
   />
 )
-
 const LoadingPage = ({ text = 'Loading content...', className = '' }) => (
   <div className={cn("flex flex-col items-center justify-center py-12", className)}>
     <LoadingSpinner size="lg" text={text} />
   </div>
 )
-
 const LoadingCard = ({ text = 'Loading...', className = '' }) => (
   <div className={cn("flex items-center justify-center py-8", className)}>
     <LoadingSpinner size="md" text={text} />
   </div>
 )
-
 const LoadingInline = ({ size = 'sm', variant = 'primary', className = '' }) => (
   <LoadingSpinner 
     size={size} 
@@ -96,22 +86,17 @@ const LoadingInline = ({ size = 'sm', variant = 'primary', className = '' }) => 
     className={className}
   />
 )
-
-// Pulse animation for loading states
 const LoadingPulse = ({ className = '', children }) => (
   <div className={cn("animate-pulse", className)}>
     {children}
   </div>
 )
-
-// Dots loading animation
 const LoadingDots = ({ size = 'md', variant = 'primary', className = '' }) => {
   const dotSizeClasses = {
     sm: 'w-1 h-1',
     md: 'w-2 h-2',
     lg: 'w-3 h-3'
   }
-
   const dotColorClasses = {
     primary: 'bg-blue-500',
     secondary: 'bg-gray-500',
@@ -120,7 +105,6 @@ const LoadingDots = ({ size = 'md', variant = 'primary', className = '' }) => {
     warning: 'bg-yellow-500',
     white: 'bg-white'
   }
-
   return (
     <div className={cn("flex items-center space-x-1", className)}>
       <div className={cn(
@@ -141,7 +125,6 @@ const LoadingDots = ({ size = 'md', variant = 'primary', className = '' }) => {
     </div>
   )
 }
-
 export { 
   LoadingSpinner, 
   LoadingButton, 

@@ -1,44 +1,38 @@
 /**
- * CSV Service - Handle CSV export and data formatting
- * Manages result exports and file operations
+ * CSV Service
+ * 
+ * Handles CSV file operations for LinkedIn alumni scraper including
+ * data export, file management, and result formatting.
  */
-
 import { createObjectCsvWriter } from 'csv-writer';
 import csvParser from 'csv-parser';
 import fs from 'fs-extra';
 import path from 'path';
 import { fileURLToPath } from 'url';
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
 class CsvService {
   constructor() {
-    this.resultsDir = path.join(__dirname, '../../results');
+    this.resultsDir = path.join(__dirname, '../results');
     this.currentSessionFile = null;
     this.currentWriter = null;
     this.headerWritten = false;
     this.ensureDirectories();
   }
-
   /**
    * Load search names from CSV file
    */
   async loadSearchNames() {
     try {
       const searchNamesPath = path.join(__dirname, '../../search_names.csv');
-      
       if (!await fs.pathExists(searchNamesPath)) {
         throw new Error('Search names file not found. Please create search_names.csv');
       }
-
       const names = [];
-      
       return new Promise((resolve, reject) => {
         fs.createReadStream(searchNamesPath)
           .pipe(csvParser({ headers: false }))
           .on('data', (row) => {
-            // Handle CSV with or without headers
             const name = row[0] || row.name || Object.values(row)[0];
             if (name && name.trim()) {
               names.push(name.trim());
@@ -52,36 +46,28 @@ class CsvService {
             reject(error);
           });
       });
-
     } catch (error) {
       console.error('Failed to load search names:', error);
       throw error;
     }
   }
-
   /**
    * Initialize real-time CSV session
    */
   async initializeRealTimeSession() {
     try {
-      // Generate filename with timestamp
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
       const filename = `linkedin_alumni_realtime_${timestamp}.csv`;
       this.currentSessionFile = path.join(this.resultsDir, filename);
-      
-      // Reset header flag for new session
       this.headerWritten = false;
       this.currentWriter = null;
-      
       console.log(`Real-time CSV session initialized: ${filename}`);
       return filename;
-      
     } catch (error) {
       console.error('Failed to initialize real-time session:', error);
       throw error;
     }
   }
-
   /**
    * Append single result to CSV file in real-time
    */
@@ -90,46 +76,34 @@ class CsvService {
       if (!this.currentSessionFile) {
         await this.initializeRealTimeSession();
       }
-
       const cleanedResult = this.cleanResultData(result);
-      
-      // Write header if this is the first record
       if (!this.headerWritten) {
         const headers = this.generateHeaders(cleanedResult);
-        
-        // Create CSV writer for append mode
         this.currentWriter = createObjectCsvWriter({
           path: this.currentSessionFile,
           header: headers,
           encoding: process.env.CSV_ENCODING || 'utf8',
           append: false // First write creates file
         });
-        
         await this.currentWriter.writeRecords([cleanedResult]);
         this.headerWritten = true;
-        
         console.log(`Real-time CSV header written and first record added: ${result.name}`);
       } else {
-        // Append mode for subsequent records
         this.currentWriter = createObjectCsvWriter({
           path: this.currentSessionFile,
           header: this.generateHeaders(cleanedResult),
           encoding: process.env.CSV_ENCODING || 'utf8',
           append: true // Append to existing file
         });
-        
         await this.currentWriter.writeRecords([cleanedResult]);
         console.log(`Real-time CSV record appended: ${result.name}`);
       }
-
       return this.currentSessionFile;
-
     } catch (error) {
       console.error('Failed to append result in real-time:', error);
       throw error;
     }
   }
-
   /**
    * Finalize real-time session
    */
@@ -137,17 +111,13 @@ class CsvService {
     if (this.currentSessionFile) {
       console.log(`Real-time CSV session finalized: ${path.basename(this.currentSessionFile)}`);
       const finalFile = this.currentSessionFile;
-      
-      // Reset session variables
       this.currentSessionFile = null;
       this.currentWriter = null;
       this.headerWritten = false;
-      
       return finalFile;
     }
     return null;
   }
-
   /**
    * Ensure required directories exist
    */
@@ -158,7 +128,6 @@ class CsvService {
       console.error('Failed to create directories:', error);
     }
   }
-
   /**
    * Export results to CSV file
    */
@@ -167,39 +136,25 @@ class CsvService {
       if (!results || results.length === 0) {
         throw new Error('No results to export');
       }
-
-      // Generate filename
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
       const filename = customFilename || `linkedin_alumni_${timestamp}.csv`;
       const filepath = path.join(this.resultsDir, filename);
-
-      // Define CSV headers based on data structure
       const headers = this.generateHeaders(results[0]);
-
-      // Create CSV writer
       const writer = createObjectCsvWriter({
         path: filepath,
         header: headers,
         encoding: process.env.CSV_ENCODING || 'utf8'
       });
-
-      // Clean and format data
       const cleanedResults = results.map(result => this.cleanResultData(result));
-
-      // Write to CSV
       await writer.writeRecords(cleanedResults);
-
       console.log(`CSV exported successfully: ${filename}`);
       console.log(`Total records: ${cleanedResults.length}`);
-
       return filename;
-
     } catch (error) {
       console.error('CSV export failed:', error);
       throw error;
     }
   }
-
   /**
    * Generate CSV headers from sample data
    */
@@ -218,11 +173,8 @@ class CsvService {
       { id: 'found', title: 'Found' },
       { id: 'scrapedAt', title: 'Scraped At' }
     ];
-
-    // If sample data has additional fields, include them
     if (sampleData) {
       const existingIds = defaultHeaders.map(h => h.id);
-      
       Object.keys(sampleData).forEach(key => {
         if (!existingIds.includes(key) && key !== 'error' && key !== 'experience' && key !== 'education') {
           defaultHeaders.push({
@@ -232,34 +184,25 @@ class CsvService {
         }
       });
     }
-
     return defaultHeaders;
   }
-
   /**
    * Clean and format result data for CSV
    */
   cleanResultData(result) {
     const cleaned = { ...result };
-
-    // Clean text fields
     Object.keys(cleaned).forEach(key => {
       if (typeof cleaned[key] === 'string') {
-        // Remove extra whitespace and newlines
         cleaned[key] = cleaned[key]
           .replace(/\s+/g, ' ')
           .replace(/[\r\n]/g, ' ')
           .trim();
-        
-        // Handle CSV delimiter conflicts
         const delimiter = process.env.CSV_DELIMITER || ',';
         if (cleaned[key].includes(delimiter)) {
           cleaned[key] = `"${cleaned[key].replace(/"/g, '""')}"`;
         }
       }
     });
-
-    // Ensure required fields exist
     const requiredFields = ['name', 'position', 'company', 'location', 'bio', 'experienceText', 'educationText', 'universityName', 'found', 'scrapedAt'];
     requiredFields.forEach(field => {
       if (cleaned[field] === undefined || cleaned[field] === null) {
@@ -270,42 +213,30 @@ class CsvService {
         }
       }
     });
-
-    // Format found field as boolean string
     if (typeof cleaned.found === 'boolean') {
       cleaned.found = cleaned.found ? 'Yes' : 'No';
     }
-
-    // Format date
     if (cleaned.scrapedAt) {
       try {
         const date = new Date(cleaned.scrapedAt);
         cleaned.scrapedAt = date.toLocaleString();
       } catch (e) {
-        // Keep original if parsing fails
       }
     }
-
-    // Remove complex object fields that shouldn't be in CSV
     delete cleaned.experience;
     delete cleaned.education;
-
     return cleaned;
   }
-
   /**
    * Read existing CSV file
    */
   async readCsvFile(filename) {
     try {
       const filepath = path.join(this.resultsDir, filename);
-      
       if (!await fs.pathExists(filepath)) {
         throw new Error(`File not found: ${filename}`);
       }
-
       const results = [];
-      
       return new Promise((resolve, reject) => {
         fs.createReadStream(filepath)
           .pipe(csvParser())
@@ -313,26 +244,22 @@ class CsvService {
           .on('end', () => resolve(results))
           .on('error', (error) => reject(error));
       });
-
     } catch (error) {
       console.error('Failed to read CSV file:', error);
       throw error;
     }
   }
-
   /**
    * Get list of exported CSV files
    */
   async getExportedFiles() {
     try {
       const files = await fs.readdir(this.resultsDir);
-      
       const csvFiles = files
         .filter(file => file.endsWith('.csv'))
         .map(async (file) => {
           const filepath = path.join(this.resultsDir, file);
           const stats = await fs.stat(filepath);
-          
           return {
             filename: file,
             size: stats.size,
@@ -340,54 +267,43 @@ class CsvService {
             modified: stats.mtime
           };
         });
-
       return await Promise.all(csvFiles);
-
     } catch (error) {
       console.error('Failed to get exported files:', error);
       throw error;
     }
   }
-
   /**
    * Delete CSV file
    */
   async deleteFile(filename) {
     try {
       const filepath = path.join(this.resultsDir, filename);
-      
       if (!await fs.pathExists(filepath)) {
         throw new Error(`File not found: ${filename}`);
       }
-
       await fs.remove(filepath);
       console.log(`File deleted: ${filename}`);
-
     } catch (error) {
       console.error('Failed to delete file:', error);
       throw error;
     }
   }
-
   /**
    * Load names from CSV file for searching
    */
   async loadNamesFromCsv(filename = 'search_names.csv') {
     try {
       const filepath = path.join(__dirname, '../../data', filename);
-      
       if (!await fs.pathExists(filepath)) {
         console.log(`Names file not found: ${filename}, using default names`);
         return this.getDefaultNames();
       }
-
       const names = [];
-      
       return new Promise((resolve, reject) => {
         fs.createReadStream(filepath)
           .pipe(csvParser())
           .on('data', (row) => {
-            // Try different column names
             const name = row.name || row.Name || row.fullName || row['Full Name'] || Object.values(row)[0];
             if (name && name.trim()) {
               names.push(name.trim());
@@ -402,13 +318,11 @@ class CsvService {
             resolve(this.getDefaultNames());
           });
       });
-
     } catch (error) {
       console.error('Failed to load names from CSV:', error);
       return this.getDefaultNames();
     }
   }
-
   /**
    * Get default search names if no CSV file is found
    */
@@ -426,7 +340,6 @@ class CsvService {
       'Indira Kusuma'
     ];
   }
-
   /**
    * Create sample names CSV file
    */
@@ -435,23 +348,18 @@ class CsvService {
       const sampleNames = this.getDefaultNames().map(name => ({ name }));
       const filename = 'search_names_sample.csv';
       const filepath = path.join(__dirname, '../../data', filename);
-
       const writer = createObjectCsvWriter({
         path: filepath,
         header: [{ id: 'name', title: 'Name' }]
       });
-
       await writer.writeRecords(sampleNames);
       console.log(`Sample names file created: ${filename}`);
-
       return filename;
-
     } catch (error) {
       console.error('Failed to create sample names file:', error);
       throw error;
     }
   }
-
   /**
    * Capitalize title for headers
    */
@@ -461,21 +369,17 @@ class CsvService {
       .replace(/^./, char => char.toUpperCase()) // Capitalize first letter
       .trim();
   }
-
   /**
    * Get file statistics
    */
   async getFileStats(filename) {
     try {
       const filepath = path.join(this.resultsDir, filename);
-      
       if (!await fs.pathExists(filepath)) {
         throw new Error(`File not found: ${filename}`);
       }
-
       const stats = await fs.stat(filepath);
       const records = await this.readCsvFile(filename);
-
       return {
         filename,
         size: stats.size,
@@ -483,12 +387,10 @@ class CsvService {
         created: stats.birthtime,
         modified: stats.mtime
       };
-
     } catch (error) {
       console.error('Failed to get file stats:', error);
       throw error;
     }
   }
 }
-
 export default CsvService;
