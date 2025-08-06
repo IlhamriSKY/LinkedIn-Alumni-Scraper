@@ -7,6 +7,7 @@
  * - Production mode (default): node start.js
  * - Development mode: node start.js --dev
  * - Install dependencies: node start.js --install
+ * - Force kill ports: node start.js --force (or --dev --force)
  * 
  * Production mode:
  * 1. Builds the frontend
@@ -23,6 +24,11 @@
  * 1. Installs root dependencies
  * 2. Installs backend dependencies
  * 3. Installs frontend dependencies
+ * 
+ * Force mode:
+ * 1. Kills processes using required ports (3001, 5173)
+ * 2. Works on both Windows and Linux
+ * 3. Then starts the application normally
  */
 
 import { exec, spawn } from 'child_process';
@@ -53,6 +59,7 @@ const HOST = process.env.HOST || 'localhost';
 // Check for mode flags
 const isDev = process.argv.includes('--dev') || process.argv.includes('-d');
 const isInstall = process.argv.includes('--install') || process.argv.includes('-i');
+const isForce = process.argv.includes('--force') || process.argv.includes('-f');
 
 if (isInstall) {
   console.log('Starting dependency installation process...\n');
@@ -60,8 +67,88 @@ if (isInstall) {
   process.exit(0);
 }
 
+if (isForce) {
+  console.log('Force mode: Killing processes on required ports...\n');
+  await killPortProcesses();
+}
+
 const mode = isDev ? 'Development' : 'Production';
 console.log(`Starting LinkedIn Alumni Scraper in ${mode} Mode...\n`);
+
+async function killPortProcesses() {
+  const ports = [BACKEND_PORT, FRONTEND_DEV_PORT];
+  const isWindows = process.platform === 'win32';
+  
+  console.log(`Checking ports: ${ports.join(', ')}`);
+  
+  for (const port of ports) {
+    try {
+      if (isWindows) {
+        // Windows: Use netstat and taskkill
+        const { stdout } = await execAsync(`netstat -ano | findstr :${port}`);
+        
+        if (stdout.trim()) {
+          const lines = stdout.trim().split('\n');
+          const pids = new Set();
+          
+          lines.forEach(line => {
+            const parts = line.trim().split(/\s+/);
+            const pid = parts[parts.length - 1];
+            if (pid && pid !== '0' && !isNaN(pid)) {
+              pids.add(pid);
+            }
+          });
+          
+          for (const pid of pids) {
+            try {
+              console.log(`Killing process ${pid} on port ${port}...`);
+              await execAsync(`taskkill /PID ${pid} /F`);
+              console.log(`Process ${pid} killed successfully`);
+            } catch (killError) {
+              console.log(`Could not kill process ${pid}: ${killError.message}`);
+            }
+          }
+        } else {
+          console.log(`Port ${port} is not in use`);
+        }
+      } else {
+        // Linux/macOS: Use lsof and kill
+        try {
+          const { stdout } = await execAsync(`lsof -ti :${port}`);
+          
+          if (stdout.trim()) {
+            const pids = stdout.trim().split('\n').filter(pid => pid && !isNaN(pid));
+            
+            for (const pid of pids) {
+              try {
+                console.log(`Killing process ${pid} on port ${port}...`);
+                await execAsync(`kill -9 ${pid}`);
+                console.log(`Process ${pid} killed successfully`);
+              } catch (killError) {
+                console.log(`Could not kill process ${pid}: ${killError.message}`);
+              }
+            }
+          } else {
+            console.log(`Port ${port} is not in use`);
+          }
+        } catch (lsofError) {
+          if (lsofError.message.includes('No such process')) {
+            console.log(`Port ${port} is not in use`);
+          } else {
+            console.log(`Could not check port ${port}: ${lsofError.message}`);
+          }
+        }
+      }
+    } catch (error) {
+      console.log(`Error checking port ${port}: ${error.message}`);
+    }
+  }
+  
+  console.log('Port cleanup completed\n');
+  
+  // Wait a moment for ports to be fully released
+  await new Promise(resolve => setTimeout(resolve, 1000));
+}
 
 async function installDependencies() {
   try {
@@ -95,8 +182,10 @@ async function installDependencies() {
     
     console.log('All dependencies installed successfully!');
     console.log('You can now run:');
-    console.log('  npm run dev    - Start development mode');
-    console.log('  npm start      - Start production mode');
+    console.log('  node start.js --dev    - Start development mode');
+    console.log('  node start.js          - Start production mode');
+    console.log('  node start.js --force  - Kill port processes and start');
+    console.log('  node start.js --dev --force - Kill ports and start in dev mode');
     
   } catch (error) {
     console.error('Failed to install dependencies:', error.message);

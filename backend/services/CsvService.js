@@ -15,6 +15,9 @@ const __dirname = path.dirname(__filename);
 class CsvService {
   constructor() {
     this.resultsDir = path.join(__dirname, '../../../results');
+    this.currentSessionFile = null;
+    this.currentWriter = null;
+    this.headerWritten = false;
     this.ensureDirectories();
   }
 
@@ -54,6 +57,95 @@ class CsvService {
       console.error('Failed to load search names:', error);
       throw error;
     }
+  }
+
+  /**
+   * Initialize real-time CSV session
+   */
+  async initializeRealTimeSession() {
+    try {
+      // Generate filename with timestamp
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      const filename = `linkedin_alumni_realtime_${timestamp}.csv`;
+      this.currentSessionFile = path.join(this.resultsDir, filename);
+      
+      // Reset header flag for new session
+      this.headerWritten = false;
+      this.currentWriter = null;
+      
+      console.log(`Real-time CSV session initialized: ${filename}`);
+      return filename;
+      
+    } catch (error) {
+      console.error('Failed to initialize real-time session:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Append single result to CSV file in real-time
+   */
+  async appendResultRealTime(result) {
+    try {
+      if (!this.currentSessionFile) {
+        await this.initializeRealTimeSession();
+      }
+
+      const cleanedResult = this.cleanResultData(result);
+      
+      // Write header if this is the first record
+      if (!this.headerWritten) {
+        const headers = this.generateHeaders(cleanedResult);
+        
+        // Create CSV writer for append mode
+        this.currentWriter = createObjectCsvWriter({
+          path: this.currentSessionFile,
+          header: headers,
+          encoding: process.env.CSV_ENCODING || 'utf8',
+          append: false // First write creates file
+        });
+        
+        await this.currentWriter.writeRecords([cleanedResult]);
+        this.headerWritten = true;
+        
+        console.log(`Real-time CSV header written and first record added: ${result.name}`);
+      } else {
+        // Append mode for subsequent records
+        this.currentWriter = createObjectCsvWriter({
+          path: this.currentSessionFile,
+          header: this.generateHeaders(cleanedResult),
+          encoding: process.env.CSV_ENCODING || 'utf8',
+          append: true // Append to existing file
+        });
+        
+        await this.currentWriter.writeRecords([cleanedResult]);
+        console.log(`Real-time CSV record appended: ${result.name}`);
+      }
+
+      return this.currentSessionFile;
+
+    } catch (error) {
+      console.error('Failed to append result in real-time:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Finalize real-time session
+   */
+  finalizeRealTimeSession() {
+    if (this.currentSessionFile) {
+      console.log(`Real-time CSV session finalized: ${path.basename(this.currentSessionFile)}`);
+      const finalFile = this.currentSessionFile;
+      
+      // Reset session variables
+      this.currentSessionFile = null;
+      this.currentWriter = null;
+      this.headerWritten = false;
+      
+      return finalFile;
+    }
+    return null;
   }
 
   /**
@@ -117,9 +209,13 @@ class CsvService {
       { id: 'position', title: 'Position' },
       { id: 'company', title: 'Company' },
       { id: 'location', title: 'Location' },
-      { id: 'education', title: 'Education' },
+      { id: 'bio', title: 'Bio' },
+      { id: 'experienceText', title: 'Experience' },
+      { id: 'educationText', title: 'Education' },
+      { id: 'universityName', title: 'University' },
       { id: 'profileUrl', title: 'Profile URL' },
       { id: 'searchKeyword', title: 'Search Keyword' },
+      { id: 'found', title: 'Found' },
       { id: 'scrapedAt', title: 'Scraped At' }
     ];
 
@@ -128,7 +224,7 @@ class CsvService {
       const existingIds = defaultHeaders.map(h => h.id);
       
       Object.keys(sampleData).forEach(key => {
-        if (!existingIds.includes(key) && key !== 'error') {
+        if (!existingIds.includes(key) && key !== 'error' && key !== 'experience' && key !== 'education') {
           defaultHeaders.push({
             id: key,
             title: this.capitalizeTitle(key)
@@ -164,12 +260,21 @@ class CsvService {
     });
 
     // Ensure required fields exist
-    const requiredFields = ['name', 'position', 'company', 'location', 'education', 'scrapedAt'];
+    const requiredFields = ['name', 'position', 'company', 'location', 'bio', 'experienceText', 'educationText', 'universityName', 'found', 'scrapedAt'];
     requiredFields.forEach(field => {
-      if (!cleaned[field]) {
-        cleaned[field] = 'N/A';
+      if (cleaned[field] === undefined || cleaned[field] === null) {
+        if (field === 'found') {
+          cleaned[field] = false;
+        } else {
+          cleaned[field] = 'N/A';
+        }
       }
     });
+
+    // Format found field as boolean string
+    if (typeof cleaned.found === 'boolean') {
+      cleaned.found = cleaned.found ? 'Yes' : 'No';
+    }
 
     // Format date
     if (cleaned.scrapedAt) {
@@ -180,6 +285,10 @@ class CsvService {
         // Keep original if parsing fails
       }
     }
+
+    // Remove complex object fields that shouldn't be in CSV
+    delete cleaned.experience;
+    delete cleaned.education;
 
     return cleaned;
   }

@@ -7,6 +7,8 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { StatusIndicator } from '@/components/ui/status-indicator'
+import { LoginSteps } from '@/components/ui/login-steps'
+import { AlumniDataTable } from '@/components/ui/alumni-data-table'
 import { toast } from '@/hooks/use-toast'
 import { Toaster } from '@/components/ui/toaster'
 import { 
@@ -20,7 +22,10 @@ import {
   Download,
   LogIn,
   Chrome,
-  GraduationCap
+  GraduationCap,
+  UserCheck,
+  UserX,
+  Eye
 } from 'lucide-react'
 
 // Dynamic API configuration from environment variables
@@ -64,6 +69,7 @@ class App extends React.Component {
       totalSearchNames: 0,
       scrapedCount: 0,
       notFoundCount: 0,
+      foundCount: 0,
       progressPercent: 0,
       lastScrapedName: '',
       stats: {
@@ -80,7 +86,22 @@ class App extends React.Component {
       loginStatus: 'Not Logged In', // Not Logged In, Logging In, Logged In
       browserStatus: 'Closed', // Closed, Opening, Open
       universityName: UNIVERSITY_NAME,
-      scrapingResults: []
+      scrapingResults: [],
+      alumniData: [], // Store detailed alumni data
+      currentView: 'dashboard', // dashboard, results
+      currentCsvFile: null, // Track current real-time CSV file
+      currentCsvFileName: null, // Track CSV file name for DataTable
+      csvFileStats: null, // CSV file statistics
+      // Login steps state
+      loginSteps: [
+        { title: 'Checking Status', description: 'Verifying current authentication' },
+        { title: 'Navigate Login', description: 'Opening LinkedIn login page' },
+        { title: 'Authenticating', description: 'Processing login credentials' },
+        { title: 'Complete', description: 'Successfully authenticated' }
+      ],
+      currentLoginStep: -1,
+      showLoginSteps: false,
+      loginError: false
     };
 
     // Initialize Socket.IO connection using singleton service
@@ -91,6 +112,18 @@ class App extends React.Component {
   componentDidMount() {
     // Start periodic login status check
     this.startPeriodicLoginCheck();
+    
+    // Start real-time browser monitoring
+    this.startBrowserMonitoring();
+    
+    // Load initial configuration
+    this.loadConfig();
+    
+    // Load CSV data for DataTable
+    this.loadCsvData();
+    
+    // Start periodic CSV refresh for DataTable
+    this.startCsvDataRefresh();
   }
 
   componentWillUnmount() {
@@ -99,6 +132,12 @@ class App extends React.Component {
     
     // Clear periodic check
     this.stopPeriodicLoginCheck();
+    
+    // Clear browser monitoring
+    this.stopBrowserMonitoring();
+    
+    // Clear CSV data refresh
+    this.stopCsvDataRefresh();
   }
 
   startPeriodicLoginCheck = () => {
@@ -115,6 +154,104 @@ class App extends React.Component {
       clearInterval(this.loginCheckInterval);
       this.loginCheckInterval = null;
     }
+  };
+
+  startBrowserMonitoring = () => {
+    // Monitor browser info every 2 seconds for real-time updates
+    this.browserMonitorInterval = setInterval(() => {
+      this.fetchBrowserInfo();
+    }, 2000); // Check every 2 seconds for responsive updates
+  };
+
+  stopBrowserMonitoring = () => {
+    if (this.browserMonitorInterval) {
+      clearInterval(this.browserMonitorInterval);
+      this.browserMonitorInterval = null;
+    }
+  };
+
+  startCsvDataRefresh = () => {
+    // Refresh CSV data every 5 seconds for real-time updates
+    this.csvRefreshInterval = setInterval(() => {
+      this.loadCsvData();
+    }, 5000); // Refresh every 5 seconds
+  };
+
+  stopCsvDataRefresh = () => {
+    if (this.csvRefreshInterval) {
+      clearInterval(this.csvRefreshInterval);
+      this.csvRefreshInterval = null;
+    }
+  };
+
+  loadCsvData = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/csv/current`);
+      const result = await response.json();
+      
+      if (result.success) {
+        this.setState({
+          alumniData: result.data || [],
+          currentCsvFileName: result.fileName,
+          csvFileStats: result.fileStats
+        });
+      }
+    } catch (error) {
+      console.error('Error loading CSV data:', error);
+    }
+  };
+
+  fetchBrowserInfo = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/browser/info`);
+      const result = await response.json();
+      
+      if (result.success) {
+        // Update state with latest browser info
+        this.setState(prevState => ({
+          ...prevState,
+          browserStatus: result.browserActive ? 'Open' : 'Closed',
+          currentPage: result.pageInfo.url || '',
+          currentTab: {
+            type: this.getPageTypeFromUrl(result.pageInfo.url),
+            title: result.pageInfo.title || 'No page loaded',
+            description: this.getPageDescriptionFromUrl(result.pageInfo.url),
+            url: result.pageInfo.url || '',
+            hostname: result.pageInfo.hostname || '',
+            isLinkedIn: result.pageInfo.isLinkedIn || false
+          }
+        }));
+      }
+    } catch (error) {
+      // Silently handle errors for real-time monitoring
+      console.debug('Browser info fetch error:', error);
+    }
+  };
+
+  getPageTypeFromUrl = (url) => {
+    if (!url) return 'No page loaded';
+    
+    if (url.includes('linkedin.com/feed')) return 'LinkedIn Feed';
+    if (url.includes('linkedin.com/login')) return 'Login Page';
+    if (url.includes('linkedin.com/school')) return 'University Alumni';
+    if (url.includes('linkedin.com/in/')) return 'Profile Page';
+    if (url.includes('linkedin.com/search')) return 'Search Results';
+    if (url.includes('linkedin.com')) return 'LinkedIn';
+    if (url.startsWith('about:blank')) return 'Blank Page';
+    return 'External Page';
+  };
+
+  getPageDescriptionFromUrl = (url) => {
+    if (!url) return 'No page is currently loaded';
+    
+    if (url.includes('linkedin.com/feed')) return 'Main LinkedIn feed page';
+    if (url.includes('linkedin.com/login')) return 'LinkedIn authentication page';
+    if (url.includes('linkedin.com/school')) return 'Alumni directory page';
+    if (url.includes('linkedin.com/in/')) return 'Individual LinkedIn profile';
+    if (url.includes('linkedin.com/search')) return 'LinkedIn search results';
+    if (url.includes('linkedin.com')) return 'LinkedIn platform page';
+    if (url.startsWith('about:blank')) return 'Empty browser tab';
+    return 'Non-LinkedIn website';
   };
 
   checkLoginStatusSilently = async () => {
@@ -175,8 +312,10 @@ class App extends React.Component {
         progress: data.progress || 0,
         scrapedCount: data.scrapedCount || 0,
         notFoundCount: data.notFoundCount || 0,
+        foundCount: data.foundCount || 0,
         progressPercent: data.progressPercent || 0,
         lastScrapedName: data.lastScrapedName || '',
+        currentCsvFile: data.currentCsvFile || data.finalCsvFile || prevState.currentCsvFile,
         isLoading: ['opening-browser', 'logging-in', 'navigating', 'scraping'].includes(data.status),
         isLoggingIn: data.status === 'logging-in' || data.status === 'checking-login',
         isNavigating: data.status === 'navigating',
@@ -213,18 +352,62 @@ class App extends React.Component {
           loginStatus: 'Logged In'
         }));
       }
+      
+      // Show toast for significant page changes (not for real-time updates)
+      if (data.tabChange && !data.realTimeUpdate) {
+        if (pageInfo.type === 'LinkedIn Feed') {
+          this.showToast('success', 'LinkedIn Access', 'Successfully accessed LinkedIn feed');
+        } else if (pageInfo.type === 'University Alumni') {
+          this.showToast('success', 'University Page', 'Successfully navigated to university alumni page');
+        }
+      }
     }, this.componentId);
 
     socketService.on('loginUpdate', (data) => {
       console.log('Login update:', data);
       this.setState({ 
         loginStatus: data.success ? 'Logged In' : 'Not Logged In',
-        isLoggingIn: false 
+        isLoggingIn: false,
+        showLoginSteps: false,
+        currentLoginStep: -1,
+        loginError: !data.success
       });
       if (data.success) {
         this.showToast('success', 'Login Successful', 'Successfully logged into LinkedIn');
-      } else if (!data.alreadyLoggedIn) {
+      } else if (!data.alreadyLoggedIn && data.showError !== false) {
+        // Only show login failed toast if it's not an auto-check and showError is not explicitly false
         this.showToast('destructive', 'Login Failed', data.error || 'Failed to login to LinkedIn');
+      }
+    }, this.componentId);
+
+    // New socket listener for login steps
+    socketService.on('loginStep', (data) => {
+      console.log('Login step:', data);
+      this.setState({
+        currentLoginStep: data.step,
+        showLoginSteps: true,
+        loginError: data.error || false
+      });
+      
+      // Update the step description if provided
+      if (data.title && data.step >= 0 && data.step < this.state.loginSteps.length) {
+        const updatedSteps = [...this.state.loginSteps];
+        updatedSteps[data.step] = {
+          ...updatedSteps[data.step],
+          title: data.title,
+          description: data.description || updatedSteps[data.step].description
+        };
+        this.setState({ loginSteps: updatedSteps });
+      }
+      
+      // Hide steps when login is completed successfully
+      if (data.completed) {
+        setTimeout(() => {
+          this.setState({ 
+            showLoginSteps: false,
+            currentLoginStep: -1 
+          });
+        }, 2000); // Hide after 2 seconds
       }
     }, this.componentId);
 
@@ -252,21 +435,29 @@ class App extends React.Component {
       console.log('Scraping result:', data);
       this.setState(prevState => ({
         scrapingResults: [...prevState.scrapingResults, data]
+        // Don't update alumniData here - let CSV refresh handle it
       }));
+      
+      // Trigger immediate CSV refresh to get updated data
+      this.loadCsvData();
     }, this.componentId);
 
     // New tab monitoring socket listener
     socketService.on('tabUpdate', (data) => {
       console.log('Tab update received:', data);
-      // Update the current tab info if needed
+      // Update the current tab info if needed (removed tabCount)
       this.setState(prevState => ({
         ...prevState,
         currentTab: {
           ...prevState.currentTab,
-          tabCount: data.tabCount || 0,
           timestamp: data.timestamp
         }
       }));
+      
+      // Don't show toast for real-time updates to avoid spam
+      if (!data.realTimeUpdate) {
+        console.log(`Tab update processed`);
+      }
     }, this.componentId);
   }
 
@@ -324,7 +515,7 @@ class App extends React.Component {
 
   loadConfig = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/config`);
+      const response = await fetch(`${API_BASE_URL}/api/config`);
       const config = await response.json();
       
       // Configuration is now loaded from environment variables
@@ -392,7 +583,13 @@ class App extends React.Component {
   }
 
   handleLogin = async () => {
-    this.setState({ isLoggingIn: true, loginStatus: 'Checking Login...' });
+    this.setState({ 
+      isLoggingIn: true, 
+      loginStatus: 'Checking Login...',
+      showLoginSteps: true,
+      currentLoginStep: 0,
+      loginError: false
+    });
     
     try {
       // First check if already logged in
@@ -409,15 +606,28 @@ class App extends React.Component {
         // Already logged in
         this.setState({ 
           loginStatus: 'Logged In',
-          isLoggingIn: false 
+          isLoggingIn: false,
+          currentLoginStep: 3,
+          showLoginSteps: true
         });
         this.showToast('info', 'Already Logged In', 'You are already logged in to LinkedIn');
+        
+        // Hide steps after delay
+        setTimeout(() => {
+          this.setState({ 
+            showLoginSteps: false,
+            currentLoginStep: -1 
+          });
+        }, 2000);
         return;
       }
       
       // Not logged in, proceed with login process
       console.log('Not logged in, starting login process...');
-      this.setState({ loginStatus: 'Logging In...' });
+      this.setState({ 
+        loginStatus: 'Logging In...',
+        currentLoginStep: 1
+      });
       
       const response = await fetch(`${API_BASE_URL}/api/login`, {
         method: 'POST',
@@ -426,16 +636,33 @@ class App extends React.Component {
       
       const result = await response.json();
       if (result.success) {
-        this.setState({ loginStatus: 'Logged In' });
+        this.setState({ 
+          loginStatus: 'Logged In',
+          currentLoginStep: 3
+        });
         this.showToast('success', 'Login Successful', 'Successfully logged into LinkedIn');
+        
+        // Hide steps after delay
+        setTimeout(() => {
+          this.setState({ 
+            showLoginSteps: false,
+            currentLoginStep: -1 
+          });
+        }, 2000);
       } else {
         console.error('Login failed:', result.message);
-        this.setState({ loginStatus: 'Not Logged In' });
+        this.setState({ 
+          loginStatus: 'Not Logged In',
+          loginError: true
+        });
         this.showToast('destructive', 'Login Failed', result.message || 'Failed to login to LinkedIn');
       }
     } catch (error) {
       console.error('Error during login process:', error);
-      this.setState({ loginStatus: 'Not Logged In' });
+      this.setState({ 
+        loginStatus: 'Not Logged In',
+        loginError: true
+      });
       this.showToast('destructive', 'Login Error', 'Failed to login to LinkedIn');
     } finally {
       this.setState({ isLoggingIn: false });
@@ -472,7 +699,7 @@ class App extends React.Component {
   }
 
   handleStartScraping = async () => {
-    console.log('Starting scraping...');
+    console.log('Starting alumni-specific scraping with real-time CSV save...');
     this.setState({ isLoading: true, scrapingStatus: 'Running' });
     
     try {
@@ -483,8 +710,9 @@ class App extends React.Component {
       
       const result = await response.json();
       if (result.success) {
-        console.log('Scraping started:', result.message);
-        this.showToast('success', 'Scraping Started', 'Alumni data scraping has begun');
+        console.log('Alumni scraping started:', result.message);
+        this.setState({ currentCsvFile: result.csvFile });
+        this.showToast('success', 'Real-time Alumni Scraping Started', 'University alumni directory search has begun with instant CSV save');
       } else {
         console.error('Failed to start scraping:', result.message);
         this.setState({ scrapingStatus: 'Idle' });
@@ -544,9 +772,14 @@ class App extends React.Component {
           progressPercent: 0,
           scrapedCount: 0,
           notFoundCount: 0,
+          foundCount: 0,
           lastScrapedName: '',
+          currentCsvFile: null,
           scrapingResults: []
         });
+        
+        // Reload CSV data after reset
+        this.loadCsvData();
         console.log('Session reset:', result.message);
         this.showToast('info', 'Session Reset', 'Data scraping has been reset');
       } else {
@@ -634,7 +867,7 @@ class App extends React.Component {
               </div>
 
               {/* Statistics Cards */}
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Total Names</CardTitle>
@@ -650,13 +883,13 @@ class App extends React.Component {
 
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Scraped</CardTitle>
-                    <Activity className="h-4 w-4 text-muted-foreground" />
+                    <CardTitle className="text-sm font-medium">Found</CardTitle>
+                    <UserCheck className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold text-green-600">{this.state.scrapedCount.toLocaleString()}</div>
+                    <div className="text-2xl font-bold text-green-600">{this.state.foundCount.toLocaleString()}</div>
                     <p className="text-xs text-muted-foreground">
-                      Successfully scraped profiles
+                      Alumni profiles found
                     </p>
                   </CardContent>
                 </Card>
@@ -664,12 +897,25 @@ class App extends React.Component {
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Not Found</CardTitle>
-                    <Users className="h-4 w-4 text-muted-foreground" />
+                    <UserX className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold text-red-600">{this.state.notFoundCount.toLocaleString()}</div>
                     <p className="text-xs text-muted-foreground">
                       Names not found on LinkedIn
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Total Scraped</CardTitle>
+                    <Activity className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-blue-600">{this.state.scrapedCount.toLocaleString()}</div>
+                    <p className="text-xs text-muted-foreground">
+                      Total processed profiles
                     </p>
                   </CardContent>
                 </Card>
@@ -690,7 +936,7 @@ class App extends React.Component {
 
               {/* Progress and Controls */}
               <div className="space-y-6">
-                {/* Browser Controller */}
+              {/* Browser Controller */}
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -735,22 +981,26 @@ class App extends React.Component {
                               <Badge variant={this.state.currentTab.isLinkedIn ? 'default' : 'secondary'} className="text-xs">
                                 {this.state.currentTab.type}
                               </Badge>
-                              {this.state.currentTab.tabCount && (
-                                <Badge variant="outline" className="text-xs ml-1">
-                                  {this.state.currentTab.tabCount} tabs
-                                </Badge>
-                              )}
+                              {/* Real-time monitoring indicator */}
+                              <div className="inline-flex items-center ml-2">
+                                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                                <span className="text-xs text-green-600 ml-1">Live</span>
+                              </div>
                             </div>
                           )}
                         </div>
                       </div>
                     </div>
                     
-                    {/* Simplified Current Page Information */}
+                    {/* Simplified Current Page Information with Real-time indicator */}
                     {this.state.currentPage && (
                       <div className="text-xs text-muted-foreground p-2 bg-muted/50 rounded border">
                         <div className="font-mono break-all">
                           {this.state.currentPage}
+                        </div>
+                        <div className="flex items-center mt-1 text-green-600">
+                          <div className="w-1 h-1 bg-green-500 rounded-full animate-ping mr-1"></div>
+                          <span className="text-xs">Real-time monitoring active</span>
                         </div>
                       </div>
                     )}
@@ -791,10 +1041,10 @@ class App extends React.Component {
                         </Button>
                       )}
                       
-                      {/* Navigate University Button - Show when browser open and on LinkedIn (more flexible condition) */}
+                      {/* Navigate University Button - Show only when on LinkedIn Feed specifically */}
                       {this.state.browserStatus === 'Open' && 
-                       this.state.currentTab.isLinkedIn && 
-                       this.state.currentTab.type !== 'University Alumni' && (
+                       this.state.currentTab.type === 'LinkedIn Feed' && 
+                       this.state.currentTab.url.includes('/feed') && (
                         <Button
                           size="sm"
                           variant="secondary"
@@ -817,46 +1067,14 @@ class App extends React.Component {
                       )}
                     </div>
                     
-                    {/* Helper Text */}
-                    {this.state.browserStatus === 'Closed' && (
-                      <div className="text-sm text-blue-600 dark:text-blue-400 flex items-center">
-                        ℹ️ Start by opening the Chrome browser
-                      </div>
-                    )}
-                    
-                    {this.state.browserStatus === 'Open' && 
-                     this.state.loginStatus === 'Not Logged In' && 
-                     !this.state.currentTab.isLinkedIn && 
-                     !this.state.isLoggingIn && (
-                      <div className="text-sm text-green-600 dark:text-green-400 flex items-center">
-                        ✅ Browser ready! Click "Login to LinkedIn" to authenticate
-                      </div>
-                    )}
-                    
-                    {this.state.isLoggingIn && (
-                      <div className="text-sm text-amber-600 dark:text-amber-400 flex items-center">
-                        🔄 {this.state.loginStatus === 'Checking Login...' ? 'Checking if already logged in...' : 'Authenticating with LinkedIn...'}
-                      </div>
-                    )}
-                    
-                    {(this.state.loginStatus === 'Logged In' || 
-                      (this.state.currentTab.isLinkedIn && this.state.currentTab.type === 'LinkedIn Feed')) && 
-                     this.state.currentTab.type !== 'University Alumni' && 
-                     !this.state.isNavigating && (
-                      <div className="text-sm text-purple-600 dark:text-purple-400 flex items-center">
-                        🎯 LinkedIn detected! Click "Navigate to University" to proceed
-                      </div>
-                    )}
-                    
-                    {this.state.currentTab.type === 'University Alumni' && !this.state.isNavigating && (
-                      <div className="text-sm text-emerald-600 dark:text-emerald-400 flex items-center">
-                        🎓 Ready on university alumni page! You can start scraping now
-                      </div>
-                    )}
-                    
-                    {this.state.isNavigating && (
-                      <div className="text-sm text-amber-600 dark:text-amber-400 flex items-center">
-                        🚀 Navigating to university alumni page...
+                    {/* Login Steps Indicator */}
+                    {this.state.showLoginSteps && (
+                      <div className="mt-4 p-3 bg-muted/20 rounded-md border">
+                        <LoginSteps 
+                          currentStep={this.state.currentLoginStep}
+                          steps={this.state.loginSteps}
+                          isError={this.state.loginError}
+                        />
                       </div>
                     )}
                   </CardContent>
@@ -885,6 +1103,12 @@ class App extends React.Component {
                           Last processed: {this.state.lastScrapedName}
                         </div>
                       )}
+                      {this.state.currentCsvFile && this.state.scrapingStatus === 'Running' && (
+                        <div className="text-xs text-green-600 dark:text-green-400 flex items-center">
+                          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse mr-2"></div>
+                          Real-time save: {this.state.currentCsvFile.split('/').pop() || this.state.currentCsvFile}
+                        </div>
+                      )}
                     </div>
                     
                     <div className="flex items-center space-x-2">
@@ -894,8 +1118,17 @@ class App extends React.Component {
                         disabled={this.state.scrapingStatus === 'Running' || this.state.loginStatus !== 'Logged In'}
                         className="bg-green-600 hover:bg-green-700 text-white border-0"
                       >
-                        <Play className="h-4 w-4 mr-1" />
-                        {this.state.scrapingStatus === 'Paused' ? 'Resume' : 'Start'}
+                        {this.state.scrapingStatus === 'Running' ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-1"></div>
+                            Running Alumni Search
+                          </>
+                        ) : (
+                          <>
+                            <Play className="h-4 w-4 mr-1" />
+                            {this.state.scrapingStatus === 'Paused' ? 'Resume Alumni Search' : 'Start Alumni Search'}
+                          </>
+                        )}
                       </Button>
                       <Button
                         size="sm"
@@ -917,75 +1150,19 @@ class App extends React.Component {
                         <RotateCcw className="h-4 w-4 mr-1" />
                         Reset
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={this.handleExportData}
-                        disabled={this.state.scrapingResults.length === 0}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white border-0"
-                      >
-                        <Download className="h-4 w-4 mr-1" />
-                        Export CSV
-                      </Button>
                     </div>
-                    
-                    {this.state.loginStatus !== 'Logged In' && (
-                      <div className="text-sm text-amber-600 dark:text-amber-400">
-                        ⚠ Please login first to start scraping
-                      </div>
-                    )}
                   </CardContent>
                 </Card>
 
-                {/* Results Table */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Database className="h-5 w-5" />
-                      Scraping Results
-                    </CardTitle>
-                    <CardDescription>
-                      Latest scraped profiles and results
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {this.state.scrapingResults.length === 0 ? (
-                      <div className="text-center py-8 text-muted-foreground">
-                        No results yet. Start scraping to see results here.
-                      </div>
-                    ) : (
-                      <div className="max-h-96 overflow-auto">
-                        <table className="w-full text-sm">
-                          <thead className="border-b">
-                            <tr>
-                              <th className="text-left p-2">Name</th>
-                              <th className="text-left p-2">Status</th>
-                              <th className="text-left p-2">Position</th>
-                              <th className="text-left p-2">Company</th>
-                              <th className="text-left p-2">Location</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {this.state.scrapingResults.slice(-10).map((result, index) => (
-                              <tr key={index} className="border-b hover:bg-muted/50">
-                                <td className="p-2 font-medium">{result.name}</td>
-                                <td className="p-2">
-                                  <Badge variant={result.found ? "default" : "destructive"} className="text-xs">
-                                    {result.found ? "Found" : "Not Found"}
-                                  </Badge>
-                                </td>
-                                <td className="p-2 text-muted-foreground">{result.position || "N/A"}</td>
-                                <td className="p-2 text-muted-foreground">{result.company || "N/A"}</td>
-                                <td className="p-2 text-muted-foreground">{result.location || "N/A"}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
+                {/* Results DataTable - CSV Source */}
+                <AlumniDataTable 
+                  data={this.state.alumniData}
+                  title="Alumni Scraping Results"
+                  isLoading={this.state.scrapingStatus === 'Running'}
+                />
+                </div>
+              
+              {/* Remove Alumni Results View section since we no longer have view switching */}
             </div>
           </main>
           

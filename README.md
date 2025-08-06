@@ -129,6 +129,9 @@ node start.js --install
 # Start development mode
 node start.js --dev
 
+# Start development mode with force kill ports (if ports are busy)
+node start.js --dev --force
+
 # This will start:
 # - Frontend dev server: http://localhost:5173
 # - Backend server: http://localhost:3001
@@ -140,11 +143,28 @@ node start.js --dev
 # Start production mode
 node start.js
 
+# Start production mode with force kill ports (if ports are busy)
+node start.js --force
+
 # This will:
 # 1. Build the frontend for production
 # 2. Start the backend server
 # 3. Serve frontend through backend: http://localhost:3001
 ```
+
+### Port Conflicts
+
+If you encounter "port already in use" errors, use the `--force` flag to automatically kill processes using the required ports (3001 and 5173):
+
+```bash
+# For development
+node start.js --dev --force
+
+# For production
+node start.js --force
+```
+
+This works on both Windows and Linux/macOS systems.
 
 ---
 
@@ -155,7 +175,7 @@ node start.js
 1. Start the application (development or production mode)
 2. Open your browser and navigate to:
    - **Development**: http://localhost:5173
-   - **Production**: http://localhost:3001
+   - **Production**: http://localhost:5173
 
 ### Step 2: Browser Setup
 

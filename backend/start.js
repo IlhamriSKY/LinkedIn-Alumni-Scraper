@@ -97,11 +97,13 @@ setInterval(async () => {
   if (actualBrowserStatus) {
     try {
       const pageInfo = await browserService.getPageInfo();
-      if (pageInfo && pageInfo.url !== appState.currentPage) {
+      if (pageInfo) {
+        const pageChanged = pageInfo.url !== appState.currentPage;
         const previousPage = appState.currentPage;
         appState.currentPage = pageInfo.url;
         
-        // Emit enhanced page update with full info via socket
+        // Always emit page update (even if URL didn't change) for real-time monitoring
+        // This ensures frontend always has the latest page info
         io.emit('pageUpdate', {
           url: pageInfo.url,
           title: pageInfo.title,
@@ -111,11 +113,14 @@ setInterval(async () => {
           ready: pageInfo.ready,
           currentPage: pageInfo.url,
           previousPage: previousPage,
-          tabChange: true,
-          timestamp: new Date().toISOString()
+          tabChange: pageChanged,
+          timestamp: new Date().toISOString(),
+          realTimeUpdate: true
         });
         
-        console.log('Page updated:', pageInfo.url, pageInfo.title);
+        if (pageChanged) {
+          console.log('Page changed:', pageInfo.url, pageInfo.title);
+        }
       }
 
       // Check for tab count changes and emit via socket
@@ -123,11 +128,12 @@ setInterval(async () => {
         const pages = await browserService.browser.pages();
         const tabCount = pages.length;
         
-        // Emit tab count update via socket for real-time monitoring
+        // Always emit tab count for real-time monitoring
         io.emit('tabUpdate', {
           tabCount: tabCount,
           timestamp: new Date().toISOString(),
-          currentUrl: pageInfo?.url || 'unknown'
+          currentUrl: pageInfo?.url || 'unknown',
+          realTimeUpdate: true
         });
       }
     } catch (error) {
@@ -156,6 +162,7 @@ let appState = {
   currentProfile: { name: '', position: '', company: '', location: '' },
   totalProfiles: 0,
   scrapedCount: 0,
+  foundCount: 0,
   results: [],
   error: null,
   // Enhanced tracking fields
@@ -233,30 +240,108 @@ io.on('connection', (socket) => {
       }
 
       logger.info('Logging in to LinkedIn via Socket.IO');
+      
+      // Step 1: Initial check
       updateState({
         status: 'logging-in',
         message: 'Logging in to LinkedIn...',
         error: null
       });
+      
+      io.emit('loginStep', {
+        step: 0,
+        title: 'Checking current login status...',
+        description: 'Verifying if already logged in'
+      });
+
+      // Check if already logged in first
+      const loginCheck = await linkedInService.checkLoginStatus();
+      
+      if (loginCheck.success && loginCheck.alreadyLoggedIn) {
+        // Already logged in
+        io.emit('loginStep', {
+          step: 3,
+          title: 'Already logged in!',
+          description: 'LinkedIn session detected',
+          completed: true
+        });
+        
+        updateState({
+          loggedIn: true,
+          status: 'authenticated',
+          message: 'Already logged in to LinkedIn'
+        });
+        
+        io.emit('loginUpdate', { 
+          success: true, 
+          message: 'Already logged in to LinkedIn',
+          alreadyLoggedIn: true 
+        });
+        return;
+      }
+
+      // Step 2: Navigate to login page
+      io.emit('loginStep', {
+        step: 1,
+        title: 'Navigating to login page...',
+        description: 'Opening LinkedIn authentication'
+      });
+
+      // Step 3: Login process
+      io.emit('loginStep', {
+        step: 2,
+        title: 'Processing login...',
+        description: 'Please complete login in browser'
+      });
 
       const success = await linkedInService.login();
       
-      if (success) {
+      if (success.success) {
+        // Step 4: Success
+        io.emit('loginStep', {
+          step: 3,
+          title: 'Login successful!',
+          description: 'Successfully authenticated with LinkedIn',
+          completed: true
+        });
+        
         updateState({
           loggedIn: true,
           status: 'authenticated',
           message: 'Successfully logged in to LinkedIn'
         });
+        
+        io.emit('loginUpdate', { 
+          success: true, 
+          message: 'Successfully logged in to LinkedIn',
+          alreadyLoggedIn: false 
+        });
       } else {
-        throw new Error('Login failed - please check credentials');
+        throw new Error(success.message || 'Login failed - please check credentials');
       }
 
     } catch (error) {
       logger.error('Failed to login', { error: error.message });
+      
+      // Emit login step error
+      io.emit('loginStep', {
+        step: -1,
+        title: 'Login failed',
+        description: error.message,
+        error: true
+      });
+      
       updateState({
+        loggedIn: false,
         status: 'error',
         message: `Login failed: ${error.message}`,
         error: error.message
+      });
+      
+      io.emit('loginUpdate', { 
+        success: false, 
+        message: error.message,
+        error: error.message 
       });
     }
   });
@@ -455,14 +540,14 @@ app.get('/api/search-names-count', async (req, res) => {
   }
 });
 
-// Check login status manually
+// Check login status manually (non-intrusive)
 app.get('/api/login/check', async (req, res) => {
   try {
     if (!appState.browserOpen) {
       throw new Error('Browser is not open. Please open browser first.');
     }
 
-    logger.info('Manual login status check via API');
+    logger.info('Manual login status check via API (non-intrusive)');
     const loginCheck = await linkedInService.checkLoginStatus();
     
     // Update app state based on check result
@@ -484,6 +569,7 @@ app.get('/api/login/check', async (req, res) => {
       success: true, 
       loggedIn: loginCheck.success && loginCheck.alreadyLoggedIn,
       message: loginCheck.message,
+      nonIntrusive: true,
       state: appState
     });
 
@@ -516,6 +602,51 @@ app.get('/api/config', (req, res) => {
   });
 });
 
+// Get real-time browser info without refreshing
+app.get('/api/browser/info', async (req, res) => {
+  try {
+    const browserActive = browserService.isActive();
+    let pageInfo = null;
+    let tabCount = 0;
+    
+    if (browserActive) {
+      try {
+        pageInfo = await browserService.getPageInfo();
+        if (browserService.browser) {
+          const pages = await browserService.browser.pages();
+          tabCount = pages.length;
+        }
+      } catch (error) {
+        console.log('Error getting browser info:', error.message);
+      }
+    }
+    
+    res.json({
+      success: true,
+      browserActive: browserActive,
+      pageInfo: pageInfo || {
+        url: 'about:blank',
+        title: 'No page loaded',
+        hostname: '',
+        pathname: '',
+        isLinkedIn: false,
+        ready: false
+      },
+      tabCount: tabCount,
+      state: appState,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+      browserActive: false,
+      pageInfo: null,
+      tabCount: 0
+    });
+  }
+});
+
 // Open browser
 app.post('/api/browser/open', async (req, res) => {
   try {
@@ -534,9 +665,9 @@ app.post('/api/browser/open', async (req, res) => {
       message: 'Browser opened successfully'
     });
 
-    // After browser is open, automatically check login status
+    // After browser is open, automatically check login status (non-intrusive)
     try {
-      logger.info('Auto-checking login status after browser open...');
+      logger.info('Auto-checking login status after browser open (non-intrusive)...');
       const loginCheck = await linkedInService.checkLoginStatus();
       
       if (loginCheck.success && loginCheck.alreadyLoggedIn) {
@@ -558,11 +689,12 @@ app.post('/api/browser/open', async (req, res) => {
           message: 'Browser opened - Please login to LinkedIn'
         });
         
-        // Emit login update to frontend
+        // Emit login update to frontend (don't show error toast for auto-check)
         io.emit('loginUpdate', { 
           success: false, 
           message: 'Not logged in - Please login to LinkedIn',
-          alreadyLoggedIn: false 
+          alreadyLoggedIn: false,
+          showError: false // Don't show error toast for auto-check after browser open
         });
       }
 
@@ -580,8 +712,37 @@ app.post('/api/browser/open', async (req, res) => {
           currentPage: pageInfo.url
         });
       }
+
+      // Setup real-time page monitoring with event listeners
+      browserService.setPageChangeCallback((eventType, url) => {
+        console.log(`Page event: ${eventType}${url ? ` - ${url}` : ''}`);
+        
+        // Emit immediate page update when page changes
+        setTimeout(async () => {
+          try {
+            const updatedPageInfo = await browserService.getPageInfo();
+            if (updatedPageInfo) {
+              appState.currentPage = updatedPageInfo.url;
+              io.emit('pageUpdate', {
+                url: updatedPageInfo.url,
+                title: updatedPageInfo.title,
+                hostname: updatedPageInfo.hostname,
+                pathname: updatedPageInfo.pathname,
+                isLinkedIn: updatedPageInfo.isLinkedIn,
+                ready: updatedPageInfo.ready,
+                currentPage: updatedPageInfo.url,
+                eventType: eventType,
+                instantUpdate: true,
+                timestamp: new Date().toISOString()
+              });
+            }
+          } catch (error) {
+            console.log('Error in page change callback:', error.message);
+          }
+        }, 500); // Small delay to ensure page is ready
+      });
     } catch (autoCheckError) {
-      logger.warn('Auto login check failed:', autoCheckError.message);
+      logger.warn('Auto login check failed (non-critical):', autoCheckError.message);
       // Don't fail the browser open if login check fails
     }
 
@@ -615,10 +776,18 @@ app.post('/api/login', async (req, res) => {
     }
 
     logger.info('Checking login status and logging in to LinkedIn via API');
+    
+    // Step 1: Initial check
     updateState({
       status: 'checking-login',
       message: 'Checking if already logged in...',
       error: null
+    });
+    
+    io.emit('loginStep', {
+      step: 0,
+      title: 'Checking current login status...',
+      description: 'Verifying if already logged in'
     });
 
     // First check if already logged in
@@ -626,10 +795,24 @@ app.post('/api/login', async (req, res) => {
     
     if (loginCheck.success && loginCheck.alreadyLoggedIn) {
       // Already logged in
+      io.emit('loginStep', {
+        step: 3,
+        title: 'Already logged in!',
+        description: 'LinkedIn session detected',
+        completed: true
+      });
+      
       updateState({
         loggedIn: true,
         status: 'authenticated',
         message: 'Already logged in to LinkedIn - Feed ready'
+      });
+
+      // Emit login update to frontend
+      io.emit('loginUpdate', { 
+        success: true, 
+        message: 'Already logged in to LinkedIn - Feed ready',
+        alreadyLoggedIn: true 
       });
 
       res.json({ 
@@ -641,6 +824,13 @@ app.post('/api/login', async (req, res) => {
       return;
     }
 
+    // Step 2: Navigate to login page
+    io.emit('loginStep', {
+      step: 1,
+      title: 'Navigating to login page...',
+      description: 'Opening LinkedIn authentication'
+    });
+
     // Need to login
     updateState({
       status: 'logging-in',
@@ -648,13 +838,35 @@ app.post('/api/login', async (req, res) => {
       error: null
     });
 
+    // Step 3: Login process
+    io.emit('loginStep', {
+      step: 2,
+      title: 'Processing login...',
+      description: 'Please complete login in browser'
+    });
+
     const result = await linkedInService.login();
     
     if (result.success) {
+      // Step 4: Success
+      io.emit('loginStep', {
+        step: 3,
+        title: 'Login successful!',
+        description: 'Successfully authenticated with LinkedIn',
+        completed: true
+      });
+      
       updateState({
         loggedIn: true,
         status: 'authenticated',
         message: 'Successfully logged in to LinkedIn - Feed ready'
+      });
+
+      // Emit login update to frontend
+      io.emit('loginUpdate', { 
+        success: true, 
+        message: 'Successfully logged in to LinkedIn - Feed ready',
+        alreadyLoggedIn: false 
       });
 
       res.json({ 
@@ -669,11 +881,27 @@ app.post('/api/login', async (req, res) => {
 
   } catch (error) {
     logger.error('Failed to login', { error: error.message });
+    
+    // Emit login step error
+    io.emit('loginStep', {
+      step: -1,
+      title: 'Login failed',
+      description: error.message,
+      error: true
+    });
+    
     updateState({
       loggedIn: false,
       status: 'error',
       message: `Login failed: ${error.message}`,
       error: error.message
+    });
+
+    // Emit login update to frontend
+    io.emit('loginUpdate', { 
+      success: false, 
+      message: error.message,
+      error: error.message 
     });
 
     res.status(500).json({ 
@@ -765,6 +993,9 @@ app.post('/api/scrape/start', async (req, res) => {
     // Load search names
     const searchNames = await csvService.loadSearchNames();
     
+    // Initialize real-time CSV session
+    const csvFilename = await csvService.initializeRealTimeSession();
+    
     // Determine starting point for resume capability
     let startIndex = 0;
     if (appState.lastScrapedIndex >= 0 && appState.lastScrapedIndex < searchNames.length - 1) {
@@ -781,10 +1012,11 @@ app.post('/api/scrape/start', async (req, res) => {
     updateState({
       scrapingActive: true,
       status: 'scraping',
-      message: startIndex > 0 ? `Resuming scraping from: ${searchNames[startIndex]}` : 'Starting scraping process...',
+      message: startIndex > 0 ? `Resuming scraping from: ${searchNames[startIndex]}` : 'Starting scraping process with real-time CSV save...',
       totalProfiles: searchNames.length,
       progress: Math.round((startIndex / searchNames.length) * 100),
       progressPercent: (startIndex / searchNames.length) * 100,
+      currentCsvFile: csvFilename,
       error: null
     });
 
@@ -793,10 +1025,11 @@ app.post('/api/scrape/start', async (req, res) => {
 
     res.json({ 
       success: true, 
-      message: startIndex > 0 ? `Resuming scraping from: ${searchNames[startIndex]}` : 'Scraping started successfully',
+      message: startIndex > 0 ? `Resuming scraping from: ${searchNames[startIndex]}` : 'Scraping started with real-time CSV save',
       totalProfiles: searchNames.length,
       resuming: startIndex > 0,
       startIndex: startIndex,
+      csvFile: csvFilename,
       state: appState
     });
 
@@ -878,6 +1111,12 @@ app.post('/api/scrape/reset', async (req, res) => {
   try {
     logger.info('Resetting scraping session via API');
     
+    // Finalize any active real-time CSV session
+    const finalizedFile = csvService.finalizeRealTimeSession();
+    if (finalizedFile) {
+      logger.info('Finalized active real-time CSV session during reset', { file: finalizedFile });
+    }
+    
     updateState({
       scrapingActive: false,
       status: 'idle',
@@ -885,15 +1124,19 @@ app.post('/api/scrape/reset', async (req, res) => {
       progress: 0,
       progressPercent: 0,
       scrapedCount: 0,
+      foundCount: 0,
       notFoundCount: 0,
       lastScrapedName: '',
       lastScrapedIndex: -1,
+      currentCsvFile: null,
+      finalCsvFile: null,
       results: []
     });
 
     res.json({ 
       success: true, 
       message: 'Scraping session reset successfully',
+      finalizedFile: finalizedFile,
       state: appState
     });
 
@@ -903,6 +1146,95 @@ app.post('/api/scrape/reset', async (req, res) => {
       success: false, 
       message: error.message,
       state: appState
+    });
+  }
+});
+
+// Get current CSV data for DataTable
+app.get('/api/csv/current', async (req, res) => {
+  try {
+    // Get the most recent CSV file
+    const csvFiles = await csvService.getExportedFiles();
+    
+    if (csvFiles.length === 0) {
+      return res.json({
+        success: true,
+        data: [],
+        message: 'No CSV files found',
+        fileName: null
+      });
+    }
+    
+    // Sort by creation date, get most recent
+    const mostRecentFile = csvFiles.sort((a, b) => new Date(b.created) - new Date(a.created))[0];
+    
+    // Read the CSV data
+    const csvData = await csvService.readCsvFile(mostRecentFile.filename);
+    
+    res.json({
+      success: true,
+      data: csvData,
+      fileName: mostRecentFile.filename,
+      fileStats: mostRecentFile,
+      message: `Loaded ${csvData.length} records from ${mostRecentFile.filename}`
+    });
+
+  } catch (error) {
+    logger.error('Failed to get current CSV data', { error: error.message });
+    res.status(500).json({
+      success: false,
+      data: [],
+      message: error.message,
+      fileName: null
+    });
+  }
+});
+
+// Get all CSV files list
+app.get('/api/csv/files', async (req, res) => {
+  try {
+    const csvFiles = await csvService.getExportedFiles();
+    
+    res.json({
+      success: true,
+      files: csvFiles,
+      count: csvFiles.length,
+      message: `Found ${csvFiles.length} CSV files`
+    });
+
+  } catch (error) {
+    logger.error('Failed to get CSV files list', { error: error.message });
+    res.status(500).json({
+      success: false,
+      files: [],
+      count: 0,
+      message: error.message
+    });
+  }
+});
+
+// Get specific CSV file data
+app.get('/api/csv/:filename', async (req, res) => {
+  try {
+    const { filename } = req.params;
+    const csvData = await csvService.readCsvFile(filename);
+    const fileStats = await csvService.getFileStats(filename);
+    
+    res.json({
+      success: true,
+      data: csvData,
+      fileName: filename,
+      fileStats: fileStats,
+      message: `Loaded ${csvData.length} records from ${filename}`
+    });
+
+  } catch (error) {
+    logger.error('Failed to get CSV file data', { error: error.message, filename: req.params.filename });
+    res.status(500).json({
+      success: false,
+      data: [],
+      message: error.message,
+      fileName: req.params.filename
     });
   }
 });
@@ -949,25 +1281,54 @@ app.get('/api/download/results', async (req, res) => {
   }
 });
 
-// Get current state
-app.get('/api/state', (req, res) => {
-  res.json(appState);
-});
-
 // Core scraping function
 async function scrapeProfiles(searchNames, startIndex = 0) {
   try {
-    logger.info('Starting profile scraping', { 
+    logger.info('Starting alumni profile scraping', { 
       totalNames: searchNames.length, 
       startIndex,
       resuming: startIndex > 0 
     });
     
+    // Navigate to university alumni page before starting scraping
+    updateState({
+      status: 'navigating-to-alumni',
+      message: 'Navigating to university alumni page...'
+    });
+    
+    try {
+      logger.info('Navigating to university alumni page before scraping...');
+      const navigationResult = await linkedInService.navigateToUniversityAlumni();
+      
+      if (!navigationResult.success) {
+        throw new Error(navigationResult.message || 'Failed to navigate to university alumni page');
+      }
+      
+      logger.info('Successfully navigated to university alumni page');
+      updateState({
+        status: 'scraping',
+        message: 'Ready to start alumni search - Now on university alumni page'
+      });
+      
+      // Small delay to ensure page is ready
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+    } catch (navError) {
+      logger.error('Failed to navigate to university alumni page before scraping', { error: navError.message });
+      updateState({
+        scrapingActive: false,
+        status: 'error',
+        message: `Failed to navigate to university alumni page: ${navError.message}`,
+        error: navError.message
+      });
+      return;
+    }
+    
     for (let i = startIndex; i < searchNames.length && appState.scrapingActive; i++) {
       const name = searchNames[i];
       
       try {
-        logger.info('Processing profile', { name, index: i + 1, total: searchNames.length });
+        logger.info('Processing alumni profile', { name, index: i + 1, total: searchNames.length });
         
         const progressPercent = (i / searchNames.length) * 100;
         
@@ -980,13 +1341,14 @@ async function scrapeProfiles(searchNames, startIndex = 0) {
           lastScrapedIndex: i
         });
 
-        // Search and extract profile data
+        // Search and extract alumni profile data using university alumni search
         const profileData = await linkedInService.searchAndExtract(name);
         
-        if (profileData && profileData.name) {
-          // Profile found
+        if (profileData && profileData.found) {
+          // Alumni profile found
           appState.results.push(profileData);
           appState.scrapedCount++;
+          appState.foundCount++;
           
           const resultData = {
             name: profileData.name,
@@ -994,73 +1356,151 @@ async function scrapeProfiles(searchNames, startIndex = 0) {
             position: profileData.position,
             company: profileData.company,
             location: profileData.location,
+            bio: profileData.bio,
+            experience: profileData.experience,
+            education: profileData.education,
+            experienceText: profileData.experienceText,
+            educationText: profileData.educationText,
+            profileUrl: profileData.profileUrl,
+            universityName: profileData.universityName,
+            searchKeyword: profileData.searchKeyword,
+            scrapedAt: profileData.scrapedAt,
             timestamp: new Date().toISOString()
           };
           
+          // Real-time save to CSV
+          try {
+            await csvService.appendResultRealTime(resultData);
+            logger.info('Result saved to CSV in real-time', { name: profileData.name });
+          } catch (csvError) {
+            logger.error('Failed to save result to CSV in real-time', { error: csvError.message });
+          }
+          
           updateState({
             currentProfile: profileData,
-            message: `Found: ${profileData.name} - ${profileData.position} at ${profileData.company}`,
+            message: `Found: ${profileData.name} - ${profileData.position} at ${profileData.company} (Saved to CSV)`,
             results: [...appState.results],
+            scrapedCount: appState.scrapedCount,
+            foundCount: appState.foundCount
+          });
+
+          // Emit result to frontend
+          io.emit('scrapingResult', resultData);
+
+          logger.info('Alumni profile found and saved', { 
+            name: profileData.name,
+            position: profileData.position,
+            company: profileData.company,
+            totalResults: appState.results.length 
+          });
+        } else {
+          // Alumni profile not found
+          appState.notFoundCount++;
+          appState.scrapedCount++;
+          
+          const resultData = {
+            name: name,
+            found: false,
+            position: 'Not found',
+            company: 'N/A',
+            location: 'N/A',
+            bio: '',
+            experience: [],
+            education: [],
+            experienceText: '',
+            educationText: '',
+            profileUrl: '',
+            universityName: process.env.UNIVERSITY_NAME || 'Unknown University',
+            searchKeyword: name,
+            scrapedAt: new Date().toISOString(),
+            error: profileData?.error || 'Not found in alumni directory',
+            timestamp: new Date().toISOString()
+          };
+          
+          // Real-time save to CSV
+          try {
+            await csvService.appendResultRealTime(resultData);
+            logger.info('Not found result saved to CSV in real-time', { name });
+          } catch (csvError) {
+            logger.error('Failed to save not found result to CSV in real-time', { error: csvError.message });
+          }
+          
+          updateState({
+            message: `No alumni profile found for: ${name} (Saved to CSV)`,
+            notFoundCount: appState.notFoundCount,
             scrapedCount: appState.scrapedCount
           });
 
           // Emit result to frontend
           io.emit('scrapingResult', resultData);
-
-          logger.info('Profile found and added', { 
-            name: profileData.name,
-            totalResults: appState.results.length 
-          });
-        } else {
-          // Profile not found
-          appState.notFoundCount++;
           
-          const resultData = {
-            name: name,
-            found: false,
-            position: null,
-            company: null,
-            location: null,
-            timestamp: new Date().toISOString()
-          };
-          
-          updateState({
-            message: `No profile found for: ${name}`,
-            notFoundCount: appState.notFoundCount
-          });
-
-          // Emit result to frontend
-          io.emit('scrapingResult', resultData);
-          
-          logger.info('Profile not found', { name });
+          logger.info('Alumni profile not found but saved', { name });
         }
 
-        // Random delay between searches
-        const delay = Math.random() * 3000 + 2000; // 2-5 seconds
+        // Navigate back to alumni page for next search (except for last iteration)
+        if (i < searchNames.length - 1 && appState.scrapingActive) {
+          try {
+            logger.info('Navigating back to alumni page for next search...');
+            updateState({
+              message: `Preparing for next search... (${i + 2}/${searchNames.length})`
+            });
+            
+            const navResult = await linkedInService.navigateBackToAlumniPage();
+            if (!navResult.success) {
+              logger.warn('Failed to navigate back to alumni page, continuing anyway...', { error: navResult.message });
+            } else {
+              logger.info('Successfully navigated back to alumni page');
+            }
+          } catch (navError) {
+            logger.warn('Navigation back to alumni page failed, continuing anyway...', { error: navError.message });
+          }
+        }
+
+        // Random delay between searches (3-6 seconds for detailed profile scraping)
+        const delay = Math.random() * 3000 + 3000; // 3-6 seconds
         await new Promise(resolve => setTimeout(resolve, delay));
 
       } catch (error) {
-        logger.error('Error processing profile', { 
+        logger.error('Error processing alumni profile', { 
           name, 
           error: error.message 
         });
         
         // Count as not found if error occurs
         appState.notFoundCount++;
+        appState.scrapedCount++;
         
         const resultData = {
           name: name,
           found: false,
-          position: null,
-          company: null,
-          location: null,
+          position: 'Error',
+          company: 'Error',
+          location: 'Error',
+          bio: 'Error occurred during scraping',
+          experience: [],
+          education: [],
+          experienceText: '',
+          educationText: '',
+          profileUrl: '',
+          universityName: process.env.UNIVERSITY_NAME || 'Unknown University',
+          searchKeyword: name,
           error: error.message,
+          scrapedAt: new Date().toISOString(),
           timestamp: new Date().toISOString()
         };
         
+        // Real-time save to CSV
+        try {
+          await csvService.appendResultRealTime(resultData);
+          logger.info('Error result saved to CSV in real-time', { name });
+        } catch (csvError) {
+          logger.error('Failed to save error result to CSV in real-time', { error: csvError.message });
+        }
+        
         updateState({
-          message: `Error processing ${name}: ${error.message}`,
-          notFoundCount: appState.notFoundCount
+          message: `Error processing ${name}: ${error.message} (Saved to CSV)`,
+          notFoundCount: appState.notFoundCount,
+          scrapedCount: appState.scrapedCount
         });
 
         // Emit error result to frontend
@@ -1070,25 +1510,24 @@ async function scrapeProfiles(searchNames, startIndex = 0) {
 
     // Scraping completed
     if (appState.scrapingActive) {
-      logger.info('Scraping completed', { 
+      logger.info('Alumni scraping completed', { 
         totalProcessed: searchNames.length,
         resultsFound: appState.results.length,
+        foundCount: appState.foundCount,
         scrapedCount: appState.scrapedCount,
         notFoundCount: appState.notFoundCount
       });
 
-      // Auto-export results
-      if (appState.results.length > 0) {
-        const csvPath = await csvService.exportResults(appState.results);
-        logger.info('Results auto-exported', { csvPath });
-      }
-
+      // Finalize real-time CSV session
+      const finalCsvFile = csvService.finalizeRealTimeSession();
+      
       updateState({
         scrapingActive: false,
         status: 'completed',
-        message: `Scraping completed! Found ${appState.scrapedCount} profiles, ${appState.notFoundCount} not found.`,
+        message: `Alumni scraping completed! Found ${appState.foundCount} profiles, ${appState.notFoundCount} not found, ${appState.scrapedCount} total processed. Results saved to: ${finalCsvFile ? path.basename(finalCsvFile) : 'CSV file'}`,
         progress: 100,
-        progressPercent: 100
+        progressPercent: 100,
+        finalCsvFile: finalCsvFile
       });
     }
 

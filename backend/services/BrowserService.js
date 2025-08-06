@@ -66,6 +66,9 @@ class BrowserService {
       
       // Configure page for normal Chrome behavior
       await this.configurePage();
+      
+      // Setup real-time page event listeners
+      await this.setupPageEventListeners();
     }
 
     return this.page;
@@ -138,6 +141,62 @@ class BrowserService {
     } catch (error) {
       console.error('Failed to configure page:', error);
     }
+  }
+
+  /**
+   * Setup real-time page event listeners for monitoring without refresh
+   */
+  async setupPageEventListeners() {
+    if (!this.page) return;
+
+    try {
+      // Listen for page navigation events
+      this.page.on('load', () => {
+        console.log('Page loaded event triggered');
+        if (this.onPageChange) {
+          this.onPageChange('load');
+        }
+      });
+
+      this.page.on('domcontentloaded', () => {
+        console.log('DOM content loaded event triggered');
+        if (this.onPageChange) {
+          this.onPageChange('domcontentloaded');
+        }
+      });
+
+      this.page.on('framenavigated', (frame) => {
+        if (frame === this.page.mainFrame()) {
+          console.log('Frame navigated to:', frame.url());
+          if (this.onPageChange) {
+            this.onPageChange('framenavigated', frame.url());
+          }
+        }
+      });
+
+      // Listen for URL changes (including SPA routing)
+      this.page.on('response', (response) => {
+        // Only log important responses, not all resources
+        if (response.url().includes('linkedin.com') && response.status() === 200) {
+          console.log('Important LinkedIn response:', response.url());
+          if (this.onPageChange) {
+            this.onPageChange('response', response.url());
+          }
+        }
+      });
+
+      console.log('Page event listeners setup for real-time monitoring');
+
+    } catch (error) {
+      console.error('Failed to setup page event listeners:', error);
+    }
+  }
+
+  /**
+   * Set callback for page change events
+   */
+  setPageChangeCallback(callback) {
+    this.onPageChange = callback;
   }
 
   /**
