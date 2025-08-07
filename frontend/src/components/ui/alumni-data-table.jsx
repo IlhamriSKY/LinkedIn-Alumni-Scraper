@@ -1,6 +1,6 @@
 import React from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { DataTable, columns } from '@/components/ui/data-table'
+import { DataTable } from '@/components/ui/data-table'
 import { Database } from 'lucide-react'
 
 /**
@@ -21,7 +21,6 @@ export function AlumniDataTable({ data = [], title = "Alumni Data", isLoading = 
       </CardHeader>
       <CardContent>
         <DataTable 
-          columns={columns} 
           data={data} 
           title={title}
           isLoading={isLoading}

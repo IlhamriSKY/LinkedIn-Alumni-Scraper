@@ -9,6 +9,7 @@ backend/.env
 # Sensitive Data Files
 search_names.csv
 results/*.csv
+backend/results/*.csv
 backend/data/*.csv
 backend/data/scraping_result/*.csv
 

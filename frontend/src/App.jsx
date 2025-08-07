@@ -90,17 +90,6 @@ class App extends React.Component {
       currentCsvFileName: null, // Track CSV file name for DataTable
       csvFileStats: null, // CSV file statistics
       loginToastShown: false, // Flag to prevent duplicate login success toast
-      scrapingProgress: {
-        currentSearch: '',
-        foundCount: 0,
-        currentProfile: 0,
-        totalProfiles: 0,
-        currentProfileName: '',
-        completedProfiles: 0,
-        errorCount: 0,
-        status: '',
-        searchResults: []
-      },
       loginSteps: [
         { title: 'Checking Status', description: 'Verifying current authentication' },
         { title: 'Navigate Login', description: 'Opening LinkedIn login page' },
@@ -423,38 +412,16 @@ class App extends React.Component {
       switch (data.type) {
         case 'search_progress':
           console.log(`Found ${data.data.foundCount} profiles for: ${data.data.searchName}`);
-          this.setState(prevState => ({
-            scrapingProgress: {
-              ...prevState.scrapingProgress,
-              currentSearch: data.data.searchName,
-              foundCount: data.data.foundCount,
-              status: data.data.status,
-              searchResults: data.data.profiles || []
-            }
-          }));
           break;
           
         case 'profile_processing':
           console.log(`Processing profile ${data.data.currentProfile}/${data.data.totalProfiles}: ${data.data.profileName}`);
-          this.setState(prevState => ({
-            scrapingProgress: {
-              ...prevState.scrapingProgress,
-              currentProfile: data.data.currentProfile,
-              totalProfiles: data.data.totalProfiles,
-              currentProfileName: data.data.profileName,
-              status: data.data.status
-            }
-          }));
           break;
           
         case 'profile_complete':
           console.log(`Completed profile: ${data.data.profile.name}`);
           this.setState(prevState => ({
-            scrapingResults: [...prevState.scrapingResults, data.data.profile],
-            scrapingProgress: {
-              ...prevState.scrapingProgress,
-              completedProfiles: (prevState.scrapingProgress.completedProfiles || 0) + 1
-            }
+            scrapingResults: [...prevState.scrapingResults, data.data.profile]
           }));
           // Update CSV data
           this.loadCsvData();
@@ -463,11 +430,7 @@ class App extends React.Component {
         case 'profile_error':
           console.log(`Error processing profile: ${data.data.profile.name} - ${data.data.error}`);
           this.setState(prevState => ({
-            scrapingResults: [...prevState.scrapingResults, data.data.profile],
-            scrapingProgress: {
-              ...prevState.scrapingProgress,
-              errorCount: (prevState.scrapingProgress.errorCount || 0) + 1
-            }
+            scrapingResults: [...prevState.scrapingResults, data.data.profile]
           }));
           break;
           
@@ -1006,104 +969,6 @@ class App extends React.Component {
                     )}
                   </CardContent>
                 </Card>
-
-                {/* Real-time Scraping Progress */}
-                {this.state.scrapingProgress.currentSearch && (
-                  <Card className="border-blue-200 dark:border-blue-800">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
-                        <Eye className="h-5 w-5" />
-                        Real-time Scraping Progress
-                      </CardTitle>
-                      <CardDescription>
-                        Live monitoring of profile extraction for: {this.state.scrapingProgress.currentSearch}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      {/* Progress Summary */}
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                        <div className="text-center p-2 bg-muted/20 rounded">
-                          <div className="text-lg font-bold text-blue-600">
-                            {this.state.scrapingProgress.foundCount}
-                          </div>
-                          <div className="text-xs text-muted-foreground">Found</div>
-                        </div>
-                        <div className="text-center p-2 bg-muted/20 rounded">
-                          <div className="text-lg font-bold text-green-600">
-                            {this.state.scrapingProgress.completedProfiles || 0}
-                          </div>
-                          <div className="text-xs text-muted-foreground">Completed</div>
-                        </div>
-                        <div className="text-center p-2 bg-muted/20 rounded">
-                          <div className="text-lg font-bold text-orange-600">
-                            {this.state.scrapingProgress.currentProfile || 0}
-                          </div>
-                          <div className="text-xs text-muted-foreground">Processing</div>
-                        </div>
-                        <div className="text-center p-2 bg-muted/20 rounded">
-                          <div className="text-lg font-bold text-red-600">
-                            {this.state.scrapingProgress.errorCount || 0}
-                          </div>
-                          <div className="text-xs text-muted-foreground">Errors</div>
-                        </div>
-                      </div>
-
-                      {/* Current Profile Processing */}
-                      {this.state.scrapingProgress.currentProfileName && (
-                        <div className="p-3 bg-muted/10 rounded border">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <div className="font-medium text-sm">
-                                Processing: {this.state.scrapingProgress.currentProfileName}
-                              </div>
-                              <div className="text-xs text-muted-foreground">
-                                Profile {this.state.scrapingProgress.currentProfile} of {this.state.scrapingProgress.totalProfiles}
-                              </div>
-                            </div>
-                            <LoadingInline size="sm" variant="primary" />
-                          </div>
-                          <div className="mt-2">
-                            <Progress 
-                              value={
-                                this.state.scrapingProgress.totalProfiles > 0 
-                                  ? (this.state.scrapingProgress.currentProfile / this.state.scrapingProgress.totalProfiles) * 100 
-                                  : 0
-                              } 
-                              className="w-full h-2" 
-                            />
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Status Message */}
-                      {this.state.scrapingProgress.status && (
-                        <div className="text-xs text-muted-foreground bg-muted/10 p-2 rounded">
-                          Status: {this.state.scrapingProgress.status}
-                        </div>
-                      )}
-
-                      {/* Search Results Preview */}
-                      {this.state.scrapingProgress.searchResults.length > 0 && (
-                        <div className="space-y-2">
-                          <div className="text-sm font-medium">Found Profiles:</div>
-                          <div className="space-y-1 max-h-32 overflow-y-auto">
-                            {this.state.scrapingProgress.searchResults.slice(0, 3).map((profile, index) => (
-                              <div key={index} className="text-xs p-2 bg-muted/10 rounded flex justify-between">
-                                <span>{profile.name}</span>
-                                <span className="text-muted-foreground">{profile.subtitle}</span>
-                              </div>
-                            ))}
-                            {this.state.scrapingProgress.searchResults.length > 3 && (
-                              <div className="text-xs text-muted-foreground text-center">
-                                + {this.state.scrapingProgress.searchResults.length - 3} more profiles
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                )}
 
                 {/* Scraping Controller */}
                 <Card>

@@ -7,7 +7,11 @@
 import puppeteer from 'puppeteer';
 import path from 'path';
 import fs from 'fs-extra';
-import { fileURLToPath } from 'url';
+import {
+  fileURLToPath
+} from 'url';
+import logger from '../utils/logger.js';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 class BrowserService {
@@ -29,9 +33,9 @@ class BrowserService {
         waitUntil: 'networkidle2',
         timeout: 30000
       });
-      console.log('Browser opened with LinkedIn homepage - ready like normal user');
+      // Browser ready - suppressed log for clean output
     } catch (error) {
-      console.log('Failed to load LinkedIn, using blank page');
+      // Failed to load LinkedIn, using blank page - suppressed log
       await page.goto('about:blank');
     }
   }
@@ -46,10 +50,10 @@ class BrowserService {
       const pages = await this.browser.pages();
       if (pages.length > 0) {
         this.page = pages[0]; // Use the first available page
-        console.log('Using existing page');
+        // Using existing page - suppressed log
       } else {
         this.page = await this.browser.newPage();
-        console.log('Created new page');
+        // Created new page - suppressed log
       }
       await this.configurePage();
       await this.setupPageEventListeners();
@@ -79,20 +83,23 @@ class BrowserService {
       if (process.env.CHROME_EXECUTABLE_PATH) {
         launchOptions.executablePath = process.env.CHROME_EXECUTABLE_PATH;
       }
-      console.log('Launching browser with anti-detection...');
+      // Launching browser with anti-detection - suppressed log
       this.browser = await puppeteer.launch(launchOptions);
       this.browser.on('disconnected', () => {
-        console.log('Browser disconnected');
+        // Browser disconnected - suppressed log
         this.browser = null;
         this.page = null;
         if (this.onBrowserClosed) {
           this.onBrowserClosed();
         }
       });
-      console.log('Browser initialized successfully with default tab');
+      // Browser initialized successfully - suppressed log
       return this.browser;
     } catch (error) {
-      console.error('Failed to initialize browser:', error);
+      logger.error('Failed to initialize browser:', {
+        error: error.message,
+        stack: error.stack
+      });
       throw error;
     }
   }
@@ -102,7 +109,7 @@ class BrowserService {
   async configurePage() {
     if (!this.page) return;
     try {
-      console.log('Page configured with minimal settings like normal Chrome');
+      // Page configured with minimal settings - suppressed log
     } catch (error) {
       console.error('Failed to configure page:', error);
     }
@@ -114,20 +121,20 @@ class BrowserService {
     if (!this.page) return;
     try {
       this.page.on('load', () => {
-        console.log('Page loaded event triggered');
+        // Page loaded event - suppressed log
         if (this.onPageChange) {
           this.onPageChange('load');
         }
       });
       this.page.on('domcontentloaded', () => {
-        console.log('DOM content loaded event triggered');
+        // DOM content loaded - suppressed log
         if (this.onPageChange) {
           this.onPageChange('domcontentloaded');
         }
       });
       this.page.on('framenavigated', (frame) => {
         if (frame === this.page.mainFrame()) {
-          console.log('Frame navigated to:', frame.url());
+          // Frame navigated - suppressed log for clean output
           if (this.onPageChange) {
             this.onPageChange('framenavigated', frame.url());
           }
@@ -135,13 +142,13 @@ class BrowserService {
       });
       this.page.on('response', (response) => {
         if (response.url().includes('linkedin.com') && response.status() === 200) {
-          console.log('Important LinkedIn response:', response.url());
+          // Important LinkedIn response - suppressed log for clean output
           if (this.onPageChange) {
             this.onPageChange('response', response.url());
           }
         }
       });
-      console.log('Page event listeners setup for real-time monitoring');
+      // Page event listeners setup - suppressed log for clean output
     } catch (error) {
       console.error('Failed to setup page event listeners:', error);
     }
@@ -160,12 +167,12 @@ class BrowserService {
       if (!this.page) {
         throw new Error('Browser not initialized');
       }
-      console.log(`Navigating to: ${url}`);
+      // Navigating to URL - suppressed log
       await this.page.goto(url, {
         waitUntil: options.waitUntil || 'domcontentloaded',
         timeout: options.timeout || 30000
       });
-      console.log(`Successfully navigated to: ${url}`);
+      // Successfully navigated - suppressed log
       return this.page;
     } catch (error) {
       console.error(`Failed to navigate to ${url}:`, error);
@@ -177,8 +184,12 @@ class BrowserService {
    */
   async typeHumanLike(selector, text, options = {}) {
     try {
-      const element = await this.page.waitForSelector(selector, { timeout: 10000 });
-      await element.click({ clickCount: 3 });
+      const element = await this.page.waitForSelector(selector, {
+        timeout: 10000
+      });
+      await element.click({
+        clickCount: 3
+      });
       for (const char of text) {
         await element.type(char, {
           delay: Math.random() * (200 - 50) + 50 // 50-200ms delay
@@ -195,9 +206,9 @@ class BrowserService {
    */
   async clickHumanLike(selector, options = {}) {
     try {
-      const element = await this.page.waitForSelector(selector, { 
-        visible: true, 
-        timeout: 10000 
+      const element = await this.page.waitForSelector(selector, {
+        visible: true,
+        timeout: 10000
       });
       const box = await element.boundingBox();
       if (box) {
@@ -207,7 +218,9 @@ class BrowserService {
         );
       }
       await this.randomDelay(200, 800);
-      await element.click({ delay: Math.random() * 100 + 50 });
+      await element.click({
+        delay: Math.random() * 100 + 50
+      });
       await this.randomDelay(1000, 2500);
     } catch (error) {
       console.error(`Failed to click ${selector}:`, error);
@@ -233,7 +246,7 @@ class BrowserService {
         path: screenshotPath,
         fullPage: true
       });
-      console.log(`Screenshot saved: ${screenshotPath}`);
+      // Screenshot saved - suppressed log
       return screenshotPath;
     } catch (error) {
       console.error('Failed to take screenshot:', error);
@@ -261,7 +274,7 @@ class BrowserService {
         readyState: await this.page.evaluate(() => document.readyState)
       };
     } catch (error) {
-      console.error('Failed to get page info:', error);
+      // console.error('Failed to get page info:', error);
       return {
         url: this.page?.url() || 'about:blank',
         title: 'Error loading page',
@@ -291,7 +304,7 @@ class BrowserService {
         await this.browser.close();
         this.browser = null;
       }
-      console.log('Browser closed successfully');
+      // Browser closed successfully - suppressed log
     } catch (error) {
       console.error('Error closing browser:', error);
     }
@@ -318,11 +331,11 @@ class BrowserService {
   async clearBrowserDataDirectory() {
     try {
       if (await fs.pathExists(this.userDataDir)) {
-        console.log('Clearing browser data directory:', this.userDataDir);
+        // Clearing browser data directory - suppressed log
         await fs.remove(this.userDataDir);
-        console.log('Browser data directory cleared successfully');
+        // Browser data directory cleared - suppressed log
       } else {
-        console.log('Browser data directory does not exist, creating fresh...');
+        // Browser data directory does not exist - suppressed log
       }
       await fs.ensureDir(this.userDataDir);
     } catch (error) {
@@ -343,7 +356,7 @@ class BrowserService {
           origin: 'https://www.linkedin.com',
           storageTypes: 'all'
         });
-        console.log('Browser data cleared successfully');
+        // Browser data cleared successfully - suppressed log
       }
     } catch (error) {
       console.error('Failed to clear browser data:', error);

@@ -4,11 +4,16 @@
  * Handles CSV file operations for LinkedIn alumni scraper including
  * data export, file management, and result formatting.
  */
-import { createObjectCsvWriter } from 'csv-writer';
+import {
+  createObjectCsvWriter
+} from 'csv-writer';
 import csvParser from 'csv-parser';
 import fs from 'fs-extra';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import {
+  fileURLToPath
+} from 'url';
+import logger from '../utils/logger.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 class CsvService {
@@ -31,7 +36,9 @@ class CsvService {
       const names = [];
       return new Promise((resolve, reject) => {
         fs.createReadStream(searchNamesPath)
-          .pipe(csvParser({ headers: false }))
+          .pipe(csvParser({
+            headers: false
+          }))
           .on('data', (row) => {
             const name = row[0] || row.name || Object.values(row)[0];
             if (name && name.trim()) {
@@ -39,7 +46,10 @@ class CsvService {
             }
           })
           .on('end', () => {
-            console.log(`Loaded ${names.length} search names`);
+            logger.info('Search names loaded', {
+              count: names.length
+            });
+            // console.log(`Loaded ${names.length} search names`); // Suppressed for clean output
             resolve(names);
           })
           .on('error', (error) => {
@@ -47,7 +57,10 @@ class CsvService {
           });
       });
     } catch (error) {
-      console.error('Failed to load search names:', error);
+      logger.error('Failed to load search names:', {
+        error: error.message,
+        filePath: this.searchNamesFile
+      });
       throw error;
     }
   }
@@ -61,7 +74,10 @@ class CsvService {
       this.currentSessionFile = path.join(this.resultsDir, filename);
       this.headerWritten = false;
       this.currentWriter = null;
-      console.log(`Real-time CSV session initialized: ${filename}`);
+      // console.log(`Real-time CSV session initialized: ${filename}`); // Suppressed for clean output
+      logger.info('CSV session initialized', {
+        filename
+      });
       return filename;
     } catch (error) {
       console.error('Failed to initialize real-time session:', error);
@@ -73,21 +89,35 @@ class CsvService {
    */
   async appendResultRealTime(result) {
     try {
+      console.log('CSV SERVICE DEBUG - Received result:', JSON.stringify(result, null, 2));
+
       if (!this.currentSessionFile) {
         await this.initializeRealTimeSession();
+        console.log('CSV SERVICE DEBUG - Initialized new session file:', this.currentSessionFile);
       }
+
       const cleanedResult = this.cleanResultData(result);
+      console.log('CSV SERVICE DEBUG - Cleaned result:', JSON.stringify(cleanedResult, null, 2));
+
       if (!this.headerWritten) {
         const headers = this.generateHeaders(cleanedResult);
+        console.log('CSV SERVICE DEBUG - Generated headers:', headers);
+
         this.currentWriter = createObjectCsvWriter({
           path: this.currentSessionFile,
           header: headers,
           encoding: process.env.CSV_ENCODING || 'utf8',
           append: false // First write creates file
         });
+
         await this.currentWriter.writeRecords([cleanedResult]);
         this.headerWritten = true;
-        console.log(`Real-time CSV header written and first record added: ${result.name}`);
+
+        console.log(`CSV SERVICE DEBUG - Header written and first record added to: ${this.currentSessionFile}`);
+        logger.debug('CSV record added', {
+          name: result.name,
+          headerWritten: true
+        });
       } else {
         this.currentWriter = createObjectCsvWriter({
           path: this.currentSessionFile,
@@ -95,12 +125,21 @@ class CsvService {
           encoding: process.env.CSV_ENCODING || 'utf8',
           append: true // Append to existing file
         });
+
         await this.currentWriter.writeRecords([cleanedResult]);
-        console.log(`Real-time CSV record appended: ${result.name}`);
+        console.log(`CSV SERVICE DEBUG - Record appended to: ${this.currentSessionFile}`);
+        logger.debug('CSV record appended', {
+          name: result.name
+        });
       }
+
       return this.currentSessionFile;
     } catch (error) {
-      console.error('Failed to append result in real-time:', error);
+      console.error('CSV SERVICE DEBUG - Error:', error.message);
+      logger.error('Failed to append result in real-time:', {
+        error: error.message,
+        fileName: this.currentSessionFile
+      });
       throw error;
     }
   }
@@ -109,7 +148,12 @@ class CsvService {
    */
   finalizeRealTimeSession() {
     if (this.currentSessionFile) {
-      console.log(`Real-time CSV session finalized: ${path.basename(this.currentSessionFile)}`);
+      // Only log in development mode
+      if (process.env.NODE_ENV === 'development') {
+        logger.debug('CSV session finalized', {
+          filename: path.basename(this.currentSessionFile)
+        });
+      }
       const finalFile = this.currentSessionFile;
       this.currentSessionFile = null;
       this.currentWriter = null;
@@ -147,8 +191,12 @@ class CsvService {
       });
       const cleanedResults = results.map(result => this.cleanResultData(result));
       await writer.writeRecords(cleanedResults);
-      console.log(`CSV exported successfully: ${filename}`);
-      console.log(`Total records: ${cleanedResults.length}`);
+      logger.info('CSV exported successfully', {
+        filename,
+        recordCount: cleanedResults.length
+      });
+      // console.log(`CSV exported successfully: ${filename}`); // Suppressed for clean output
+      // console.log(`Total records: ${cleanedResults.length}`); // Suppressed for clean output
       return filename;
     } catch (error) {
       console.error('CSV export failed:', error);
@@ -159,19 +207,54 @@ class CsvService {
    * Generate CSV headers from sample data
    */
   generateHeaders(sampleData) {
-    const defaultHeaders = [
-      { id: 'name', title: 'Name' },
-      { id: 'position', title: 'Position' },
-      { id: 'company', title: 'Company' },
-      { id: 'location', title: 'Location' },
-      { id: 'bio', title: 'Bio' },
-      { id: 'experienceText', title: 'Experience' },
-      { id: 'educationText', title: 'Education' },
-      { id: 'universityName', title: 'University' },
-      { id: 'profileUrl', title: 'Profile URL' },
-      { id: 'searchKeyword', title: 'Search Keyword' },
-      { id: 'found', title: 'Found' },
-      { id: 'scrapedAt', title: 'Scraped At' }
+    const defaultHeaders = [{
+        id: 'name',
+        title: 'Name'
+      },
+      {
+        id: 'position',
+        title: 'Position'
+      },
+      {
+        id: 'company',
+        title: 'Company'
+      },
+      {
+        id: 'location',
+        title: 'Location'
+      },
+      {
+        id: 'bio',
+        title: 'Bio'
+      },
+      {
+        id: 'experienceText',
+        title: 'Experience'
+      },
+      {
+        id: 'educationText',
+        title: 'Education'
+      },
+      {
+        id: 'universityName',
+        title: 'University'
+      },
+      {
+        id: 'profileUrl',
+        title: 'Profile URL'
+      },
+      {
+        id: 'searchKeyword',
+        title: 'Search Keyword'
+      },
+      {
+        id: 'found',
+        title: 'Found'
+      },
+      {
+        id: 'scrapedAt',
+        title: 'Scraped At'
+      }
     ];
     if (sampleData) {
       const existingIds = defaultHeaders.map(h => h.id);
@@ -190,7 +273,9 @@ class CsvService {
    * Clean and format result data for CSV
    */
   cleanResultData(result) {
-    const cleaned = { ...result };
+    const cleaned = {
+      ...result
+    };
     Object.keys(cleaned).forEach(key => {
       if (typeof cleaned[key] === 'string') {
         cleaned[key] = cleaned[key]
@@ -220,8 +305,7 @@ class CsvService {
       try {
         const date = new Date(cleaned.scrapedAt);
         cleaned.scrapedAt = date.toLocaleString();
-      } catch (e) {
-      }
+      } catch (e) {}
     }
     delete cleaned.experience;
     delete cleaned.education;
@@ -283,7 +367,10 @@ class CsvService {
         throw new Error(`File not found: ${filename}`);
       }
       await fs.remove(filepath);
-      console.log(`File deleted: ${filename}`);
+      // console.log(`File deleted: ${filename}`); // Suppressed for clean output  
+      logger.info('File deleted', {
+        filename
+      });
     } catch (error) {
       console.error('Failed to delete file:', error);
       throw error;
@@ -296,7 +383,10 @@ class CsvService {
     try {
       const filepath = path.join(__dirname, '../../data', filename);
       if (!await fs.pathExists(filepath)) {
-        console.log(`Names file not found: ${filename}, using default names`);
+        // console.log(`Names file not found: ${filename}, using default names`); // Suppressed for clean output
+        logger.warn('Names file not found, using defaults', {
+          filename
+        });
         return this.getDefaultNames();
       }
       const names = [];
@@ -310,7 +400,11 @@ class CsvService {
             }
           })
           .on('end', () => {
-            console.log(`Loaded ${names.length} names from ${filename}`);
+            // console.log(`Loaded ${names.length} names from ${filename}`); // Suppressed for clean output
+            logger.debug('Names loaded from file', {
+              filename,
+              count: names.length
+            });
             resolve(names.length > 0 ? names : this.getDefaultNames());
           })
           .on('error', (error) => {
@@ -345,15 +439,23 @@ class CsvService {
    */
   async createSampleNamesFile() {
     try {
-      const sampleNames = this.getDefaultNames().map(name => ({ name }));
+      const sampleNames = this.getDefaultNames().map(name => ({
+        name
+      }));
       const filename = 'search_names_sample.csv';
       const filepath = path.join(__dirname, '../../data', filename);
       const writer = createObjectCsvWriter({
         path: filepath,
-        header: [{ id: 'name', title: 'Name' }]
+        header: [{
+          id: 'name',
+          title: 'Name'
+        }]
       });
       await writer.writeRecords(sampleNames);
-      console.log(`Sample names file created: ${filename}`);
+      // console.log(`Sample names file created: ${filename}`); // Suppressed for clean output
+      logger.info('Sample names file created', {
+        filename
+      });
       return filename;
     } catch (error) {
       console.error('Failed to create sample names file:', error);
@@ -388,7 +490,10 @@ class CsvService {
         modified: stats.mtime
       };
     } catch (error) {
-      console.error('Failed to get file stats:', error);
+      logger.error('Failed to get file stats', {
+        error: error.message,
+        filename
+      });
       throw error;
     }
   }

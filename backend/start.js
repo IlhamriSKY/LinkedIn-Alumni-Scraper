@@ -8,10 +8,10 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
-import morgan from 'morgan';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import logger from './utils/logger.js';
 import BrowserService from './services/BrowserService.js';
 import LinkedInService from './services/LinkedInService.js';
 import CsvService from './services/CsvService.js';
@@ -35,10 +35,10 @@ const io = new Server(server, {
   }
 });
 const browserService = new BrowserService();
-const linkedInService = new LinkedInService(browserService);
+const linkedInService = new LinkedInService(browserService, io);
 const csvService = new CsvService();
 browserService.onBrowserClosed(() => {
-  console.log('Browser was closed externally');
+  logger.warn('Browser was closed externally');
   appState.browserOpen = false;
   appState.loggedIn = false;
   appState.currentPage = '';
@@ -52,7 +52,9 @@ browserService.onBrowserClosed(() => {
 setInterval(async () => {
   const actualBrowserStatus = browserService.isActive();
   if (appState.browserOpen !== actualBrowserStatus) {
-    console.log(`Browser status mismatch detected. Updating from ${appState.browserOpen} to ${actualBrowserStatus}`);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`Browser status mismatch detected. Updating from ${appState.browserOpen} to ${actualBrowserStatus}`);
+    }
     appState.browserOpen = actualBrowserStatus;
     if (!actualBrowserStatus) {
       appState.loggedIn = false;
@@ -88,7 +90,7 @@ setInterval(async () => {
           timestamp: new Date().toISOString(),
           realTimeUpdate: true
         });
-        if (pageChanged) {
+        if (pageChanged && process.env.NODE_ENV === 'development') {
           console.log('Page changed:', pageInfo.url, pageInfo.title);
         }
       }
@@ -103,16 +105,14 @@ setInterval(async () => {
         });
       }
     } catch (error) {
-      console.debug('Page info check error:', error.message);
+      // Only log debug in development mode
+      if (process.env.NODE_ENV === 'development') {
+        console.debug('Page info check error:', error.message);
+      }
     }
   }
 }, 3000); // Check every 3 seconds for more responsive updates
-const logger = {
-  info: (...args) => console.log('[INFO]', ...args),
-  error: (...args) => console.error('[ERROR]', ...args),
-  warn: (...args) => console.warn('[WARN]', ...args),
-  debug: (...args) => console.log('[DEBUG]', ...args)
-};
+
 let appState = {
   browserOpen: false,
   loggedIn: false,
@@ -134,7 +134,10 @@ let appState = {
 };
 const updateState = (updates = {}) => {
   appState = { ...appState, ...updates };
-  logger.info('State updated', { updates });
+  // Only log state updates in development mode
+  if (process.env.NODE_ENV === 'development') {
+    logger.debug('State updated', { updates });
+  }
   io.emit('stateUpdate', appState);
 };
 app.use(helmet({
@@ -149,9 +152,13 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-app.use(morgan('combined'));
+
+// Socket.IO Connection Handler
 io.on('connection', (socket) => {
-  logger.info('Client connected', { socketId: socket.id });
+  // Only log connection in development mode
+  if (process.env.NODE_ENV === 'development') {
+    logger.info('Client connected', { socketId: socket.id });
+  }
   socket.emit('stateUpdate', appState);
   socket.on('openBrowser', async () => {
     try {
@@ -313,12 +320,17 @@ io.on('connection', (socket) => {
     }
   });
   socket.on('disconnect', () => {
-    logger.info('Client disconnected', { socketId: socket.id });
+    // Only log disconnection in development mode
+    if (process.env.NODE_ENV === 'development') {
+      logger.info('Client disconnected', { socketId: socket.id });
+    }
   });
 });
 if (NODE_ENV === 'production' || process.env.SERVE_FRONTEND === 'true') {
   const frontendDistPath = path.join(__dirname, '..', 'frontend', 'dist');
-  console.log('Serving frontend static files from:', frontendDistPath);
+  if (process.env.NODE_ENV === 'development') {
+    console.log('Serving frontend static files from:', frontendDistPath);
+  }
   app.use(express.static(frontendDistPath));
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api/')) {
@@ -359,7 +371,10 @@ app.get('/api/browser/status', async (req, res) => {
           };
         }
       } catch (error) {
-        console.warn('Error getting detailed browser status:', error.message);
+        // Only log warning in development mode
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('Error getting detailed browser status:', error.message);
+        }
       }
     }
     const status = {
@@ -485,7 +500,10 @@ app.get('/api/browser/info', async (req, res) => {
           tabCount = pages.length;
         }
       } catch (error) {
-        console.log('Error getting browser info:', error.message);
+        // Only log error in development mode
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Error getting browser info:', error.message);
+        }
       }
     }
     res.json({
@@ -567,7 +585,10 @@ app.post('/api/browser/open', async (req, res) => {
         });
       }
       browserService.setPageChangeCallback((eventType, url) => {
-        console.log(`Page event: ${eventType}${url ? ` - ${url}` : ''}`);
+        // Only log page events in development mode
+        if (process.env.NODE_ENV === 'development') {
+          // console.log(`Page event: ${eventType}${url ? ` - ${url}` : ''}`);
+        }
         setTimeout(async () => {
           try {
             const updatedPageInfo = await browserService.getPageInfo();
@@ -587,7 +608,10 @@ app.post('/api/browser/open', async (req, res) => {
               });
             }
           } catch (error) {
-            console.log('Error in page change callback:', error.message);
+            // Only log error in development mode
+            if (process.env.NODE_ENV === 'development') {
+              console.log('Error in page change callback:', error.message);
+            }
           }
         }, 500); // Small delay to ensure page is ready
       });
@@ -831,15 +855,34 @@ app.post('/api/scrape/start', async (req, res) => {
 });
 app.post('/api/scrape/stop', async (req, res) => {
   try {
+    if (!appState.scrapingActive) {
+      return res.json({ 
+        success: false, 
+        message: 'No active scraping to stop',
+        state: appState
+      });
+    }
+    
     logger.info('Stopping scraping via API');
+    
+    // Finalize current CSV session when stopping
+    const finalizedFile = csvService.finalizeRealTimeSession();
+    if (finalizedFile) {
+      logger.info('Finalized CSV session when stopping scraping', { file: finalizedFile });
+    }
+    
     updateState({
       scrapingActive: false,
       status: 'stopped',
-      message: 'Scraping stopped by user'
+      message: `Scraping stopped by user. Processed ${appState.scrapedCount || 0} profiles.`,
+      finalCsvFile: finalizedFile
     });
+    
     res.json({ 
       success: true, 
       message: 'Scraping stopped successfully',
+      finalizedFile: finalizedFile,
+      processedCount: appState.scrapedCount || 0,
       state: appState
     });
   } catch (error) {
@@ -853,17 +896,31 @@ app.post('/api/scrape/stop', async (req, res) => {
 });
 app.post('/api/scrape/pause', async (req, res) => {
   try {
+    if (!appState.scrapingActive) {
+      return res.json({ 
+        success: false, 
+        message: 'No active scraping to pause',
+        state: appState
+      });
+    }
+    
     logger.info('Pausing scraping via API');
     updateState({
       scrapingActive: false,
       status: 'paused',
-      message: `Scraping paused. Last processed: ${appState.lastScrapedName || 'None'}`
+      message: `Scraping paused. Last processed: ${appState.lastScrapedName || 'None'}. Progress: ${appState.scrapedCount}/${appState.totalProfiles || 0}`
     });
+    
     res.json({ 
       success: true, 
       message: 'Scraping paused successfully',
       lastProcessed: appState.lastScrapedName,
       canResume: true,
+      currentProgress: {
+        scrapedCount: appState.scrapedCount,
+        totalProfiles: appState.totalProfiles,
+        lastIndex: appState.lastScrapedIndex
+      },
       state: appState
     });
   } catch (error) {
@@ -878,10 +935,26 @@ app.post('/api/scrape/pause', async (req, res) => {
 app.post('/api/scrape/reset', async (req, res) => {
   try {
     logger.info('Resetting scraping session via API');
+    
+    // First, force stop any active scraping
+    if (appState.scrapingActive) {
+      logger.info('Force stopping active scraping before reset...');
+      updateState({
+        scrapingActive: false,
+        status: 'stopping',
+        message: 'Stopping scraping for reset...'
+      });
+      // Give a moment for current operation to finish
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    
+    // Finalize CSV session if exists
     const finalizedFile = csvService.finalizeRealTimeSession();
     if (finalizedFile) {
       logger.info('Finalized active real-time CSV session during reset', { file: finalizedFile });
     }
+    
+    // Reset all state
     updateState({
       scrapingActive: false,
       status: 'idle',
@@ -895,8 +968,10 @@ app.post('/api/scrape/reset', async (req, res) => {
       lastScrapedIndex: -1,
       currentCsvFile: null,
       finalCsvFile: null,
+      currentProfile: { name: '', position: '', company: '', location: '' },
       results: []
     });
+    
     res.json({ 
       success: true, 
       message: 'Scraping session reset successfully',
@@ -1147,33 +1222,34 @@ async function scrapeProfiles(searchNames, startIndex = 0) {
           lastScrapedName: name,
           lastScrapedIndex: i
         });
-        const profileData = await linkedInService.searchAndExtract(name);
+        const profileResults = await linkedInService.searchAndExtract(name);
+        console.log('DATA FLOW DEBUG - ProfileResults received:', JSON.stringify(profileResults, null, 2));
+        
+        // searchAndExtract returns array, get first result
+        const profileData = Array.isArray(profileResults) ? profileResults[0] : profileResults;
+        console.log('DATA FLOW DEBUG - ProfileData (first result):', JSON.stringify(profileData, null, 2));
+        
         if (profileData && profileData.found) {
           appState.results.push(profileData);
           appState.scrapedCount++;
           appState.foundCount++;
+          
+          // Use profileData directly, it already has all needed fields
           const resultData = {
-            name: profileData.name,
+            ...profileData, // Include all original data
             found: true,
-            position: profileData.position,
-            company: profileData.company,
-            location: profileData.location,
-            bio: profileData.bio,
-            experience: profileData.experience,
-            education: profileData.education,
-            experienceText: profileData.experienceText,
-            educationText: profileData.educationText,
-            profileUrl: profileData.profileUrl,
-            universityName: profileData.universityName,
-            searchKeyword: profileData.searchKeyword,
-            scrapedAt: profileData.scrapedAt,
             timestamp: new Date().toISOString()
           };
+          
+          console.log('DATA FLOW DEBUG - Result data to CSV:', JSON.stringify(resultData, null, 2));
+          
           try {
-            await csvService.appendResultRealTime(resultData);
-            logger.info('Result saved to CSV in real-time', { name: profileData.name });
+            const csvFile = await csvService.appendResultRealTime(resultData);
+            logger.info('Result saved to CSV in real-time', { name: profileData.name, csvFile });
+            console.log('DATA FLOW DEBUG - CSV save successful for:', profileData.name);
           } catch (csvError) {
             logger.error('Failed to save result to CSV in real-time', { error: csvError.message });
+            console.error('DATA FLOW DEBUG - CSV save failed:', csvError.message);
           }
           updateState({
             currentProfile: profileData,
@@ -1192,6 +1268,9 @@ async function scrapeProfiles(searchNames, startIndex = 0) {
         } else {
           appState.notFoundCount++;
           appState.scrapedCount++;
+          
+          console.log('DATA FLOW DEBUG - No profile found, using default data for:', name);
+          
           const resultData = {
             name: name,
             found: false,
@@ -1210,11 +1289,16 @@ async function scrapeProfiles(searchNames, startIndex = 0) {
             error: profileData?.error || 'Not found in alumni directory',
             timestamp: new Date().toISOString()
           };
+          
+          console.log('DATA FLOW DEBUG - Not found result data to CSV:', JSON.stringify(resultData, null, 2));
+          
           try {
             await csvService.appendResultRealTime(resultData);
             logger.info('Not found result saved to CSV in real-time', { name });
+            console.log('DATA FLOW DEBUG - Not found CSV save successful for:', name);
           } catch (csvError) {
             logger.error('Failed to save not found result to CSV in real-time', { error: csvError.message });
+            console.error('DATA FLOW DEBUG - Not found CSV save failed:', csvError.message);
           }
           updateState({
             message: `No alumni profile found for: ${name} (Saved to CSV)`,

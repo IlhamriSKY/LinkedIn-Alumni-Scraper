@@ -27,9 +27,11 @@ import {
   User,
   Building,
   MapPin,
-  ArrowUpDown
+  ArrowUpDown,
+  Eye,
+  EyeOff
 } from 'lucide-react'
-export const columns = [
+export const createColumns = (isSensorMode, sensorName) => [
   {
     accessorKey: "name",
     header: ({ column }) => {
@@ -47,10 +49,11 @@ export const columns = [
     },
     cell: ({ row }) => {
       const name = row.getValue("name") || row.original.Name || "Unknown"
+      const displayName = isSensorMode ? sensorName(name) : name
       return (
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-2 min-w-[180px]">
           <User className="h-4 w-4 text-muted-foreground" />
-          <div className="font-medium">{name}</div>
+          <div className="font-medium">{displayName}</div>
         </div>
       )
     },
@@ -156,9 +159,9 @@ export const columns = [
     cell: ({ row }) => {
       const bio = row.getValue("bio") || row.original.Bio || ""
       return (
-        <div className="max-w-[200px]">
-          <span className="text-xs text-muted-foreground truncate" title={bio}>
-            {bio.length > 50 ? bio.substring(0, 50) + "..." : bio || "N/A"}
+        <div className="min-w-[250px] max-w-[300px]">
+          <span className="text-xs text-muted-foreground" title={bio}>
+            {bio.length > 80 ? bio.substring(0, 80) + "..." : bio || "N/A"}
           </span>
         </div>
       )
@@ -184,13 +187,13 @@ export const columns = [
       try {
         const date = new Date(scrapedAt)
         return (
-          <div className="text-xs text-muted-foreground">
+          <div className="text-xs text-muted-foreground min-w-[140px]">
             {date.toLocaleString()}
           </div>
         )
       } catch (e) {
         return (
-          <div className="text-xs text-muted-foreground">
+          <div className="text-xs text-muted-foreground min-w-[140px]">
             {scrapedAt.toString()}
           </div>
         )
@@ -217,7 +220,6 @@ export const columns = [
   },
 ]
 export function DataTable({
-  columns,
   data,
   title = "Alumni Data",
   isLoading = false
@@ -225,10 +227,19 @@ export function DataTable({
   const [sorting, setSorting] = React.useState([])
   const [columnFilters, setColumnFilters] = React.useState([])
   const [globalFilter, setGlobalFilter] = React.useState("")
+  const [isSensorMode, setIsSensorMode] = React.useState(false)
   const [pagination, setPagination] = React.useState({
     pageIndex: 0,
     pageSize: 10,
   })
+
+  // Function to sensor name
+  const sensorName = (name) => {
+    if (!name || name === 'Unknown' || name === 'N/A') return name
+    const firstChar = name.charAt(0)
+    const restLength = name.length - 1
+    return firstChar + '*'.repeat(restLength)
+  }
   const normalizedData = React.useMemo(() => {
     return data.map(item => ({
       name: item.name || item.Name || 'Unknown',
@@ -242,9 +253,12 @@ export function DataTable({
       ...item // Keep original data as well
     }))
   }, [data])
+
+  // Generate columns with sensor mode support
+  const tableColumns = React.useMemo(() => createColumns(isSensorMode, sensorName), [isSensorMode])
   const table = useReactTable({
     data: normalizedData,
-    columns,
+    columns: tableColumns,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onGlobalFilterChange: setGlobalFilter,
@@ -319,16 +333,26 @@ export function DataTable({
             className="pl-8"
           />
         </div>
-        <Button
-          onClick={handleExport}
-          size="sm"
-          variant="outline"
-          disabled={normalizedData.length === 0}
-          className="ml-4"
-        >
-          <Download className="h-4 w-4 mr-2" />
-          Export CSV
-        </Button>
+        <div className="flex items-center space-x-2">
+          <Button
+            onClick={() => setIsSensorMode(!isSensorMode)}
+            size="sm"
+            variant={isSensorMode ? "default" : "outline"}
+            className="ml-4"
+          >
+            {isSensorMode ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
+            {isSensorMode ? "Show Names" : "Sensor"}
+          </Button>
+          <Button
+            onClick={handleExport}
+            size="sm"
+            variant="outline"
+            disabled={normalizedData.length === 0}
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Export CSV
+          </Button>
+        </div>
       </div>
       {/* Table */}
       <div className="rounded-md border">
@@ -371,7 +395,7 @@ export function DataTable({
             ) : (
               <TableRow>
                 <TableCell
-                  colSpan={columns.length}
+                  colSpan={tableColumns.length}
                   className="h-24 text-center"
                 >
                   No results.
