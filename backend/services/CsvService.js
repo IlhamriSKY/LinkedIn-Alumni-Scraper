@@ -69,11 +69,24 @@ class CsvService {
    */
   async initializeRealTimeSession() {
     try {
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-      const filename = `linkedin_alumni_realtime_${timestamp}.csv`;
+      const now = new Date();
+      
+      // Format: dd mm yy-hh mm s
+      const day = String(now.getDate()).padStart(2, '0');
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const year = String(now.getFullYear()).slice(-2);
+      const hour = String(now.getHours()).padStart(2, '0');
+      const minute = String(now.getMinutes()).padStart(2, '0');
+      const second = String(now.getSeconds()).padStart(2, '0');
+      
+      // Generate unique timestamp (milliseconds for uniqueness)
+      const uniqtime = now.getTime();
+      
+      const filename = `linkedin_alumni_realtime_${day}_${month}_${year}-${hour}_${minute}_${second}_${uniqtime}.csv`;
       this.currentSessionFile = path.join(this.resultsDir, filename);
       this.headerWritten = false;
       this.currentWriter = null;
+      
       // console.log(`Real-time CSV session initialized: ${filename}`); // Suppressed for clean output
       logger.info('CSV session initialized', {
         filename
@@ -180,8 +193,25 @@ class CsvService {
       if (!results || results.length === 0) {
         throw new Error('No results to export');
       }
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-      const filename = customFilename || `linkedin_alumni_${timestamp}.csv`;
+      
+      let filename = customFilename;
+      if (!filename) {
+        const now = new Date();
+        
+        // Format: dd mm yy-hh mm s
+        const day = String(now.getDate()).padStart(2, '0');
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const year = String(now.getFullYear()).slice(-2);
+        const hour = String(now.getHours()).padStart(2, '0');
+        const minute = String(now.getMinutes()).padStart(2, '0');
+        const second = String(now.getSeconds()).padStart(2, '0');
+        
+        // Generate unique timestamp (milliseconds for uniqueness)
+        const uniqtime = now.getTime();
+        
+        filename = `linkedin_alumni_export_${day}_${month}_${year}-${hour}_${minute}_${second}_${uniqtime}.csv`;
+      }
+      
       const filepath = path.join(this.resultsDir, filename);
       const headers = this.generateHeaders(results[0]);
       const writer = createObjectCsvWriter({

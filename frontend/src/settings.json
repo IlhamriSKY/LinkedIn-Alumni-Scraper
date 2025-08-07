@@ -1,0 +1,40 @@
+{
+  "datatable": {
+    "defaultVisibleColumns": [
+      "name",
+      "found", 
+      "position",
+      "company",
+      "location",
+      "bio",
+      "scrapedAt",
+      "actions"
+    ],
+    "sensor": {
+      "enableCompanySensor": true,
+      "enableBioSensor": true,
+      "enableLocationSensor": true,
+      "sensorChar": "●",
+      "defaultSensorMode": true
+    },
+    "pagination": {
+      "defaultPageSize": 10,
+      "pageSizeOptions": [5, 10, 20, 30, 40, 50]
+    },
+    "export": {
+      "includeHeaders": true,
+      "dateFormat": "DD_MM_YY-HH_MM_S",
+      "filenameTemplate": "linkedin_alumni_{type}_{date}_{uniqtime}.csv"
+    }
+  },
+  "ui": {
+    "theme": "system",
+    "compactMode": false,
+    "showTooltips": true
+  },
+  "scraping": {
+    "defaultDelay": 2000,
+    "maxRetries": 3,
+    "timeout": 30000
+  }
+}

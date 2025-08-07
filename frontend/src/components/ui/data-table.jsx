@@ -18,6 +18,14 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuCheckboxItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -29,9 +37,13 @@ import {
   MapPin,
   ArrowUpDown,
   Eye,
-  EyeOff
+  EyeOff,
+  Settings,
+  ChevronDown
 } from 'lucide-react'
-export const createColumns = (isSensorMode, sensorName) => [
+import { useDatatableSettings } from "@/hooks/useSettings"
+
+export const createColumns = (isSensorMode, sensorName, sensorCompany, sensorBio, sensorLocation) => [
   {
     accessorKey: "name",
     header: ({ column }) => {
@@ -116,11 +128,12 @@ export const createColumns = (isSensorMode, sensorName) => [
     },
     cell: ({ row }) => {
       const company = row.getValue("company") || row.original.Company || "N/A"
+      const displayCompany = isSensorMode ? sensorCompany(company) : company
       return (
         <div className="flex items-center space-x-1">
           <Building className="h-3 w-3 text-muted-foreground" />
-          <span className="max-w-[150px] truncate" title={company}>
-            {company}
+          <span className="max-w-[150px] truncate" title={displayCompany}>
+            {displayCompany}
           </span>
         </div>
       )
@@ -143,11 +156,12 @@ export const createColumns = (isSensorMode, sensorName) => [
     },
     cell: ({ row }) => {
       const location = row.getValue("location") || row.original.Location || "N/A"
+      const displayLocation = isSensorMode ? sensorLocation(location) : location
       return (
         <div className="flex items-center space-x-1">
           <MapPin className="h-3 w-3 text-muted-foreground" />
-          <span className="max-w-[120px] truncate" title={location}>
-            {location}
+          <span className="max-w-[120px] truncate" title={displayLocation}>
+            {displayLocation}
           </span>
         </div>
       )
@@ -158,10 +172,11 @@ export const createColumns = (isSensorMode, sensorName) => [
     header: "Bio",
     cell: ({ row }) => {
       const bio = row.getValue("bio") || row.original.Bio || ""
+      const displayBio = isSensorMode ? sensorBio(bio) : bio
       return (
         <div className="min-w-[250px] max-w-[300px]">
-          <span className="text-xs text-muted-foreground" title={bio}>
-            {bio.length > 80 ? bio.substring(0, 80) + "..." : bio || "N/A"}
+          <span className="text-xs text-muted-foreground" title={displayBio}>
+            {displayBio.length > 80 ? displayBio.substring(0, 80) + "..." : displayBio || "N/A"}
           </span>
         </div>
       )
@@ -222,24 +237,88 @@ export const createColumns = (isSensorMode, sensorName) => [
 export function DataTable({
   data,
   title = "Alumni Data",
-  isLoading = false
+  isLoading = false,
+  isSensorMode = true
 }) {
+  // Get settings from hook FIRST
+  const { 
+    datatableSettings,
+    defaultVisibleColumns,
+    sensorSettings,
+    paginationSettings 
+  } = useDatatableSettings()
+
   const [sorting, setSorting] = React.useState([])
   const [columnFilters, setColumnFilters] = React.useState([])
+  const [columnVisibility, setColumnVisibility] = React.useState({})
   const [globalFilter, setGlobalFilter] = React.useState("")
-  const [isSensorMode, setIsSensorMode] = React.useState(false)
   const [pagination, setPagination] = React.useState({
     pageIndex: 0,
     pageSize: 10,
   })
 
-  // Function to sensor name
-  const sensorName = (name) => {
-    if (!name || name === 'Unknown' || name === 'N/A') return name
-    const firstChar = name.charAt(0)
-    const restLength = name.length - 1
-    return firstChar + '*'.repeat(restLength)
-  }
+  // Initialize sensor mode from settings (default ON) - AFTER sensorSettings is defined
+  // const [isSensorMode, setIsSensorMode] = React.useState(sensorSettings?.defaultSensorMode ?? true)
+
+  // Enhanced sensor functions using settings - made more attractive
+  const sensorName = React.useCallback((name) => {
+    if (!name || name === "Unknown" || name === "N/A") return name
+    if (name.length <= 2) return name
+    const char = sensorSettings?.sensorChar || "●"
+    // Show first letter + attractive masking
+    return name.charAt(0) + char.repeat(Math.min(3, name.length - 1)) + (name.length > 4 ? name.slice(-1) : "")
+  }, [sensorSettings])
+
+  const sensorCompany = React.useCallback((company) => {
+    if (!company || company === "N/A" || company.length <= 3) return company
+    if (!sensorSettings?.enableCompanySensor) return company
+    const char = sensorSettings?.sensorChar || "●"
+    // Show first 2 chars + masking
+    return company.substring(0, 2) + char.repeat(Math.min(4, company.length - 2))
+  }, [sensorSettings])
+
+  const sensorBio = React.useCallback((bio) => {
+    if (!bio || bio === "N/A" || bio.length <= 10) return bio
+    if (!sensorSettings?.enableBioSensor) return bio
+    const char = sensorSettings?.sensorChar || "●"
+    const words = bio.split(' ')
+    if (words.length <= 2) return bio
+    // Show first 2 words + attractive masking for rest
+    return words.slice(0, 2).join(' ') + ` ${char}${char}${char} [${words.length - 2} more words] ${char}${char}${char}`
+  }, [sensorSettings])
+
+  const sensorLocation = React.useCallback((location) => {
+    if (!location || location === "N/A" || location.length <= 3) return location
+    if (!sensorSettings?.enableLocationSensor) return location
+    const char = sensorSettings?.sensorChar || "●"
+    // Show first char + masking + last char if long enough
+    return location.charAt(0) + char.repeat(Math.min(3, location.length - 1)) + (location.length > 4 ? location.slice(-1) : "")
+  }, [sensorSettings])
+
+  // Initialize default visible columns from settings
+  React.useEffect(() => {
+    if (defaultVisibleColumns && defaultVisibleColumns.length > 0) {
+      const allColumns = ["name", "found", "position", "company", "location", "bio", "scrapedAt", "actions"]
+      const initialVisibility = allColumns.reduce((acc, col) => {
+        acc[col] = defaultVisibleColumns.includes(col)
+        return acc
+      }, {})
+      setColumnVisibility(initialVisibility)
+    }
+  }, [defaultVisibleColumns])
+
+  // Update sensor mode is now controlled by parent component via props
+
+  // Initialize pagination from settings
+  React.useEffect(() => {
+    if (paginationSettings?.defaultPageSize) {
+      setPagination(prev => ({
+        ...prev,
+        pageSize: paginationSettings.defaultPageSize
+      }))
+    }
+  }, [paginationSettings])
+
   const normalizedData = React.useMemo(() => {
     return data.map(item => ({
       name: item.name || item.Name || 'Unknown',
@@ -254,8 +333,12 @@ export function DataTable({
     }))
   }, [data])
 
-  // Generate columns with sensor mode support
-  const tableColumns = React.useMemo(() => createColumns(isSensorMode, sensorName), [isSensorMode])
+  // Generate columns with enhanced sensor mode support
+  const tableColumns = React.useMemo(() => 
+    createColumns(isSensorMode, sensorName, sensorCompany, sensorBio, sensorLocation), 
+    [isSensorMode, sensorName, sensorCompany, sensorBio, sensorLocation]
+  )
+
   const table = useReactTable({
     data: normalizedData,
     columns: tableColumns,
@@ -263,6 +346,7 @@ export function DataTable({
     onColumnFiltersChange: setColumnFilters,
     onGlobalFilterChange: setGlobalFilter,
     onPaginationChange: setPagination,
+    onColumnVisibilityChange: setColumnVisibility,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -270,11 +354,13 @@ export function DataTable({
     state: {
       sorting,
       columnFilters,
+      columnVisibility,
       globalFilter,
       pagination,
     },
     globalFilterFn: "includesString",
   })
+
   const handleExport = () => {
     if (normalizedData.length === 0) return
     const headers = [
@@ -291,11 +377,24 @@ export function DataTable({
         `"${(row.scrapedAt || '').replace(/"/g, '""')}"`
       ].join(','))
     ].join('\n')
+    
+    // Generate filename with format: linkedin_alumni_export_dd_mm_yy-hh_mm_s_uniqtime
+    const now = new Date()
+    const day = String(now.getDate()).padStart(2, '0')
+    const month = String(now.getMonth() + 1).padStart(2, '0')
+    const year = String(now.getFullYear()).slice(-2)
+    const hour = String(now.getHours()).padStart(2, '0')
+    const minute = String(now.getMinutes()).padStart(2, '0')
+    const second = String(now.getSeconds()).padStart(2, '0')
+    const uniqtime = now.getTime()
+    
+    const filename = `linkedin_alumni_export_${day}_${month}_${year}-${hour}_${minute}_${second}_${uniqtime}.csv`
+    
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
     const link = document.createElement('a')
     const url = URL.createObjectURL(blob)
     link.setAttribute('href', url)
-    link.setAttribute('download', `${title.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.csv`)
+    link.setAttribute('download', filename)
     link.style.visibility = 'hidden'
     document.body.appendChild(link)
     link.click()
@@ -322,7 +421,7 @@ export function DataTable({
           </p>
         </div>
       </div>
-      {/* Search */}
+      {/* Search and Controls */}
       <div className="flex items-center justify-between py-4">
         <div className="relative max-w-sm">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -334,15 +433,33 @@ export function DataTable({
           />
         </div>
         <div className="flex items-center space-x-2">
-          <Button
-            onClick={() => setIsSensorMode(!isSensorMode)}
-            size="sm"
-            variant={isSensorMode ? "default" : "outline"}
-            className="ml-4"
-          >
-            {isSensorMode ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
-            {isSensorMode ? "Show Names" : "Sensor"}
-          </Button>
+          {/* Column Visibility Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Settings className="h-4 w-4 mr-2" />
+                Columns
+                <ChevronDown className="h-4 w-4 ml-2" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-[180px]">
+              <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {table.getAllColumns()
+                .filter(column => column.getCanHide())
+                .map(column => (
+                  <DropdownMenuCheckboxItem
+                    key={column.id}
+                    className="capitalize"
+                    checked={column.getIsVisible()}
+                    onCheckedChange={(value) => column.toggleVisibility(!!value)}
+                  >
+                    {column.id}
+                  </DropdownMenuCheckboxItem>
+                ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           <Button
             onClick={handleExport}
             size="sm"
@@ -416,7 +533,7 @@ export function DataTable({
             }}
             className="h-8 w-[70px] rounded border border-input bg-background px-2 text-sm"
           >
-            {[5, 10, 20, 30, 40, 50].map((pageSize) => (
+            {(paginationSettings?.pageSizeOptions || [5, 10, 20, 30, 40, 50]).map((pageSize) => (
               <option key={pageSize} value={pageSize}>
                 {pageSize}
               </option>

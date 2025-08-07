@@ -10,7 +10,7 @@ import { StatusIndicator } from '@/components/ui/status-indicator'
 import { LoginSteps } from '@/components/ui/login-steps'
 import { AlumniDataTable } from '@/components/ui/alumni-data-table'
 import { LoadingButton, LoadingInline } from '@/components/ui/loading-spinner'
-import { toast } from '@/hooks/use-toast'
+import { toast } from '@/hooks/useToast'
 import { Toaster } from '@/components/ui/toaster'
 import { 
   Users, 
@@ -26,8 +26,10 @@ import {
   UserCheck,
   UserX,
   Home,
-  Eye
+  Eye,
+  EyeOff
 } from 'lucide-react'
+import { useDatatableSettings } from '@/hooks/useSettings'
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
@@ -85,7 +87,7 @@ class App extends React.Component {
       universityName: UNIVERSITY_NAME,
       scrapingResults: [],
       alumniData: [], // Store detailed alumni data
-      currentView: 'dashboard', // dashboard, results
+      currentView: 'dashboard', // dashboard, results, test
       currentCsvFile: null, // Track current real-time CSV file
       currentCsvFileName: null, // Track CSV file name for DataTable
       csvFileStats: null, // CSV file statistics
@@ -98,11 +100,20 @@ class App extends React.Component {
       ],
       currentLoginStep: -1,
       showLoginSteps: false,
-      loginError: false
+      loginError: false,
+      isSensorMode: true // Add sensor mode state
     };
     this.componentId = 'main-app';
     this.setupSocketListeners();
   }
+
+  // University name sensor function
+  sensorUniversityName = (universityName) => {
+    if (!this.state.isSensorMode || !universityName || universityName.length <= 3) return universityName;
+    const char = "●";
+    return universityName.charAt(0) + char.repeat(Math.min(3, universityName.length - 1)) + (universityName.length > 4 ? universityName.slice(-1) : "");
+  }
+  
   componentDidMount() {
     this.startPeriodicLoginCheck();
     this.startBrowserMonitoring();
@@ -771,6 +782,15 @@ class App extends React.Component {
                 </div>
               </div>
               <div className="flex items-center space-x-2">
+                <Button
+                  size="sm"
+                  variant={this.state.isSensorMode ? "default" : "outline"}
+                  onClick={() => this.setState({ isSensorMode: !this.state.isSensorMode })}
+                  className="mr-2"
+                >
+                  {this.state.isSensorMode ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
+                  {this.state.isSensorMode ? "Hide Sensor" : "Show Sensor"}
+                </Button>
                 <ThemeToggle />
               </div>
             </div>
@@ -783,7 +803,7 @@ class App extends React.Component {
                 <div>
                   <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
                   <p className="text-muted-foreground">
-                    Monitor your LinkedIn scraping activities and manage data for {this.state.universityName}
+                    Monitor your LinkedIn scraping activities and manage data for {this.sensorUniversityName(this.state.universityName)}
                   </p>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -867,7 +887,7 @@ class App extends React.Component {
                       Browser Controller
                     </CardTitle>
                     <CardDescription>
-                      Manage browser and LinkedIn login for {this.state.universityName}
+                      Manage browser and LinkedIn login for {this.sensorUniversityName(this.state.universityName)}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
@@ -1047,11 +1067,38 @@ class App extends React.Component {
                   data={this.state.alumniData}
                   title="Alumni Scraping Results"
                   isLoading={false}
+                  isSensorMode={this.state.isSensorMode}
                 />
                 </div>
-              {/* Remove Alumni Results View section since we no longer have view switching */}
+                {/* Remove Alumni Results View section since we no longer have view switching */}
             </div>
           </main>
+          
+          {/* Footer */}
+          <footer className="bg-muted/30 dark:bg-muted/20 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+            <div className="container mx-auto px-4 py-4">
+              <div className="flex flex-col items-center">
+                <div className="flex items-center space-x-2 text-xs text-muted-foreground">
+                  <span>🚀 Open Source Project:</span>
+                  <a 
+                    href="https://github.com/IlhamriSKY/LinkedIn-Alumni-Scraper" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center space-x-1 px-3 py-1 rounded-full bg-primary/10 hover:bg-primary/20 text-primary hover:text-primary/80 transition-all duration-200 hover:scale-105"
+                  >
+                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 0C4.477 0 0 4.484 0 10.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0110 4.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.203 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.942.359.31.678.921.678 1.856 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0020 10.017C20 4.484 15.522 0 10 0z" clipRule="evenodd" />
+                    </svg>
+                    <span className="font-medium">LinkedIn Alumni Scraper</span>
+                    <svg className="w-3 h-3 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </a>
+                </div>
+              </div>
+            </div>
+          </footer>
+          
           {/* Toast Notifications */}
           <Toaster />
         </div>

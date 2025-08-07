@@ -15,6 +15,8 @@ import logger from './utils/logger.js';
 import BrowserService from './services/BrowserService.js';
 import LinkedInService from './services/LinkedInService.js';
 import CsvService from './services/CsvService.js';
+import settingsRoutes from './routes/settings.js';
+import settingsService from './services/SettingsService.js';
 dotenv.config();
 const PORT = process.env.PORT || 3001;
 const HOST = process.env.HOST || 'localhost';
@@ -339,6 +341,12 @@ if (NODE_ENV === 'production' || process.env.SERVE_FRONTEND === 'true') {
     res.sendFile(path.join(frontendDistPath, 'index.html'));
   });
 }
+// Load settings on startup
+await settingsService.loadSettings();
+
+// API Routes
+app.use('/api/settings', settingsRoutes);
+
 app.get('/api/browser/status', async (req, res) => {
   try {
     const isActive = browserService.isActive();

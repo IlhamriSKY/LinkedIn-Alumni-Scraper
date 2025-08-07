@@ -7,7 +7,7 @@ import { Database } from 'lucide-react'
  * Alumni DataTable Wrapper Component
  * Uses official shadcn/ui DataTable with TanStack Table
  */
-export function AlumniDataTable({ data = [], title = "Alumni Data", isLoading = false }) {
+export function AlumniDataTable({ data = [], title = "Alumni Data", isLoading = false, isSensorMode = false }) {
   return (
     <Card>
       <CardHeader>
@@ -24,6 +24,7 @@ export function AlumniDataTable({ data = [], title = "Alumni Data", isLoading = 
           data={data} 
           title={title}
           isLoading={isLoading}
+          isSensorMode={isSensorMode}
         />
       </CardContent>
     </Card>
