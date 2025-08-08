@@ -10,6 +10,8 @@
 
 *Professional LinkedIn Alumni Data Collection with Real-time Dashboard*
 
+![screenshot](image.png)
+
 [📥 Download](#-download) • [🚀 Quick Start](#-quick-start) • [📖 Documentation](#-documentation) • [⚖️ Legal Notice](#️-legal-disclaimer)
 
 </div>
